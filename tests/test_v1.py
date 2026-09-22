@@ -259,3 +259,72 @@ def test_guide_endpoint(client):
     assert data["markdown"].startswith("#")
     assert "Qwen Image Runner" in data["markdown"]
     assert data["version"]
+
+
+class _DeepSeekHandler(http.server.BaseHTTPRequestHandler):
+    """Minimal stand-in for the DeepSeek /chat/completions endpoint."""
+
+    reply = {"action": "generate", "prompt": "REFINED prompt", "reply": "ok"}
+
+    def log_message(self, *args):
+        pass
+
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length") or 0)
+        self.rfile.read(length)
+        payload = json.dumps({"choices": [{"message": {"content": json.dumps(self.reply)}}]}).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+
+def test_assistant_settings_are_masked(client):
+    client.put("/api/settings", json={"assistant": {"enabled": True, "api_key": "sk-secret-1234567890"}})
+    cfg = client.get("/api/settings").json()["assistant"]
+    assert cfg["enabled"] is True
+    assert cfg["api_key"] == ""
+    assert cfg["api_key_set"] is True
+    assert "1234567890" not in json.dumps(cfg)
+    assert cfg["api_key_hint"] == "...7890"
+
+
+def test_assistant_writes_the_prompt_and_can_chat(client):
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _DeepSeekHandler)
+    port = server.server_address[1]
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        client.put("/api/settings", json={"assistant": {
+            "enabled": True, "api_key": "test-key",
+            "base_url": f"http://127.0.0.1:{port}", "model": "deepseek-chat",
+        }})
+        assert client.post("/api/assistant/test", json={}).json()["ok"] is True
+
+        chat = client.post("/api/chats", json={}).json()["chat"]
+        _DeepSeekHandler.reply = {
+            "action": "generate",
+            "prompt": "REFINED: a red apple on a rustic table, soft window light",
+            "reply": "On it.",
+        }
+        res = client.post("/api/chat/submit", json={
+            "text": "apple please", "chat_id": chat["id"],
+            "params": {"width": 512, "height": 512, "steps": 4},
+        }).json()
+        assert res["assistant_prompt"].startswith("REFINED:")
+        job = wait_job(client, res["job"])
+        assert job["status"] == "completed"
+        # the image model received the assistant's prompt, not the raw request
+        assert job["params"]["prompt"].startswith("REFINED:")
+
+        # a question is answered in the chat instead of producing an image
+        _DeepSeekHandler.reply = {"action": "chat", "prompt": "", "reply": "Warm light suits apples best."}
+        res2 = client.post("/api/chat/submit", json={"text": "any tips?", "chat_id": chat["id"]}).json()
+        assert res2["mode"] == "chat"
+        messages = client.get(f"/api/chat?chat_id={chat['id']}").json()["messages"]
+        assert messages[-1]["role"] == "assistant"
+        assert "Warm light" in messages[-1]["text"]
+        # the refined prompt is recorded on the user message for the UI
+        assert messages[0]["meta"]["assistant_prompt"].startswith("REFINED:")
+    finally:
+        server.shutdown()

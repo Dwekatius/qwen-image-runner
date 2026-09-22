@@ -34,6 +34,9 @@
 - **Runs without a GPU** — pick CUDA, Vulkan or **CPU-only** in *Settings → Engine backend*; the app
   downloads and verifies the build you choose. CPU mode is functional but genuinely slow
   (measured: 128 s/step at 512×512) and the UI says so.
+- **Optional DeepSeek prompt assistant** — let a chat model write the image prompts: it decides new
+  image vs edit, engineers the prompt for the model, and answers questions in the chat. Bring your own
+  API key (stored locally; any OpenAI-compatible endpoint works).
 - **Native “Save as…”** — a real Windows save dialog on every result.
 - **Real progress, honest stop** — actual step count, s/it and elapsed time; queued jobs cancel
   instantly, active ones stop through an explicitly labelled engine reload.

@@ -21,6 +21,7 @@ const S = {
   lastChatImage: null,   // last assistant image (edit context)
   chatForce: null,       // 'generate' | 'edit' | null (=auto)
   settings: null,
+  assistant: {},
   samplers: ["euler"],
   backends: [],
   backendCurrent: null,
@@ -534,6 +535,22 @@ function chatUserEl(m) {
   b.className = "chat-bubble";
   b.textContent = m.text || "";
   el.appendChild(b);
+  const meta = m.meta || {};
+  if (meta.assistant_prompt) {
+    const note = document.createElement("div");
+    note.className = "chat-note";
+    note.title = meta.assistant_prompt;
+    const label = meta.assistant_action === "edit" ? "edit" : "prompt";
+    note.textContent = `✨ DeepSeek ${label}: ${meta.assistant_prompt.length > 160 ? meta.assistant_prompt.slice(0, 160) + "…" : meta.assistant_prompt}`;
+    el.appendChild(note);
+  }
+  if (meta.assistant_error) {
+    const note = document.createElement("div");
+    note.className = "chat-note";
+    note.style.color = "var(--warn)";
+    note.textContent = `Prompt assistant unavailable: ${meta.assistant_error}`;
+    el.appendChild(note);
+  }
   return el;
 }
 
@@ -628,7 +645,9 @@ function updateChatHints() {
   const el = $("#chat-params-hint");
   if (!el) return;
   const p = collectParams();
-  el.textContent = `${p.width}×${p.height} · ${p.steps} steps · ${p.sampler}`;
+  const assistant = S.assistant || {};
+  const suffix = assistant.enabled ? " · ✨ DeepSeek prompts" : "";
+  el.textContent = `${p.width}×${p.height} · ${p.steps} steps · ${p.sampler}${suffix}`;
 }
 
 async function newChat() {
@@ -666,6 +685,52 @@ async function sendChat() {
   } finally {
     btn.disabled = false;
     input.focus();
+  }
+}
+
+/* ------------------------------------------------------------ prompt assistant */
+async function saveAssistantSettings() {
+  const status = $("#set-asst-status");
+  try {
+    const payload = {
+      assistant: {
+        enabled: $("#set-asst-enabled").checked,
+        model: $("#set-asst-model").value.trim() || "deepseek-chat",
+        base_url: $("#set-asst-base").value.trim() || "https://api.deepseek.com",
+      },
+    };
+    const key = $("#set-asst-key").value.trim();
+    if (key) payload.assistant.api_key = key;
+    const res = await api("/api/settings", { method: "PUT", json: payload });
+    S.assistant = res.assistant || {};
+    $("#set-asst-key").value = "";
+    $("#set-asst-keyhint").textContent = S.assistant.api_key_set
+      ? "A key is stored locally in settings.json (gitignored - never sent anywhere except your provider)."
+      : "No key stored yet.";
+    status.textContent = "Saved.";
+    updateChatHints();
+    toast("Assistant settings saved", "ok");
+  } catch (e) {
+    status.textContent = "Save failed: " + e.message;
+  }
+}
+
+async function testAssistant() {
+  const status = $("#set-asst-status");
+  status.textContent = "Testing…";
+  try {
+    const assistant = {
+      model: $("#set-asst-model").value.trim(),
+      base_url: $("#set-asst-base").value.trim(),
+    };
+    const key = $("#set-asst-key").value.trim();
+    if (key) assistant.api_key = key;
+    const res = await api("/api/assistant/test", { method: "POST", json: { assistant } });
+    status.textContent = res.ok
+      ? `Connected to ${res.model} - replied "${res.reply}"`
+      : `Failed: ${res.error}`;
+  } catch (e) {
+    status.textContent = "Failed: " + e.message;
   }
 }
 
@@ -957,6 +1022,11 @@ async function boot() {
     return;
   }
   connectEvents();
+  try {
+    const cfg = await api("/api/settings");
+    S.assistant = cfg.assistant || {};
+  } catch { /* ignore */ }
+  updateChatHints();
   await refreshSetup();
   await Promise.all([refreshGallery(), loadSamplers(), pollSystem(), loadChats(), loadBackends()]);
   await loadChat();
@@ -1118,6 +1188,10 @@ function wire() {
   };
   $("#set-restart").onclick = () => $("#btn-engine-restart").click();
   $("#set-stop").onclick = () => $("#btn-engine-stop").click();
+
+  // prompt assistant (DeepSeek)
+  $("#set-asst-save").onclick = saveAssistantSettings;
+  $("#set-asst-test").onclick = testAssistant;
   $("#set-quit").onclick = async () => {
     if (!confirm("Quit Qwen Image Runner? The engine will stop.")) return;
     try { await api("/api/app/quit", { method: "POST" }); } catch { /* expected */ }
@@ -1129,6 +1203,21 @@ async function openSettings() {
   const meta = S.meta || await api("/api/meta");
   S.meta = meta;
   $("#set-autostart").checked = meta.settings?.engine_autostart !== false;
+  try {
+    const cfg = await api("/api/settings");
+    S.assistant = cfg.assistant || {};
+    $("#set-asst-enabled").checked = !!S.assistant.enabled;
+    $("#set-asst-key").value = "";
+    $("#set-asst-key").placeholder = S.assistant.api_key_set
+      ? `saved (${S.assistant.api_key_hint}) - type to replace`
+      : "sk-...";
+    $("#set-asst-keyhint").textContent = S.assistant.api_key_set
+      ? "A key is stored locally in settings.json (gitignored - never sent anywhere except your provider)."
+      : "No key stored yet.";
+    $("#set-asst-model").value = S.assistant.model || "deepseek-chat";
+    $("#set-asst-base").value = S.assistant.base_url || "https://api.deepseek.com";
+    $("#set-asst-status").textContent = "";
+  } catch { /* ignore */ }
   const p = meta.paths || {};
   $("#set-paths").textContent =
     `engine     ${p.engine || ""}\n` +

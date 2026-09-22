@@ -3,6 +3,37 @@
 All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses semantic versioning.
 
+## [1.1.0] — 2026-09-22
+
+### Added
+
+- **Prompt assistant (DeepSeek)** — optional chat model in front of the image model:
+  - routes each chat message through DeepSeek, which decides **new image vs edit**, writes the image
+    prompt (shown in the chat under your message) and can **answer questions** without generating;
+  - configured in Settings: API key, model, base URL (any OpenAI-compatible endpoint) and a
+    **Test connection** button; the key is stored locally in `settings.json` (gitignored) and is never
+    sent back to the browser (only a masked hint is shown);
+  - fully non-blocking: if the assistant fails, the raw prompt is used and the failure is noted in the chat.
+- **CPU-only and Vulkan backends** — the app can install and switch engine builds in
+  *Settings → Engine backend*: NVIDIA CUDA (default), Vulkan (AMD/Intel) and CPU. CPU mode was measured
+  and documented (128 s/step at 512×512 on a 6-core Ryzen), the UI warns about it, the size hint switches
+  to CPU timings and a “CPU draft · 512×512” preset was added.
+- **Guides** — a **Guide** tab inside the app (renders `docs/GUIDE.md`) plus `docs/INSTALL.md` with
+  prerequisites, the dependency list, manual installation and checksum verification.
+- **Project identity** — renamed to **Qwen Image Runner** (app, launchers `Launch.bat` / `Stop.bat`,
+  package, environment variables), with the project logo (PNG + hand-drawn vector SVGs) in the app and
+  the repository.
+- Repository hygiene: `.gitattributes`, issue + PR templates, topics, private vulnerability reporting
+  and Dependabot enabled.
+- An explicit note that the project is **AI-generated under human supervision**, in the README, the
+  Guide and the release notes.
+
+### Fixed
+
+- Settings text and password inputs were not themed (white system inputs) — now consistent with the UI.
+- The engine's per-backend binary path, arguments and error messages are backend-aware, and switching
+  backends restarts the engine with the right build.
+
 ## [1.0.0] — 2026-09-22
 
 First release: a local, LM Studio–style studio for running **Qwen-Image-2.1 (Q8 GGUF)** on a

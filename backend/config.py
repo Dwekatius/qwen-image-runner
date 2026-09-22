@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 APP_NAME = "Qwen Image Runner"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 SPDX_LICENSE = "PolyForm-Noncommercial-1.0.0"
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -91,6 +91,12 @@ DEFAULT_SETTINGS: dict = {
         "sampler": "euler",
         "batch": 1,
         "transparent": False,
+    },
+    "assistant": {
+        "enabled": False,
+        "base_url": "https://api.deepseek.com",
+        "model": "deepseek-chat",
+        "api_key": "",
     },
     "license_accepted": False,
 }

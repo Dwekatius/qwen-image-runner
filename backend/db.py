@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     text TEXT,
     image_id TEXT,
     job_id TEXT,
+    meta TEXT,
     created REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_chat_created ON chat_messages(created DESC);
@@ -84,6 +85,9 @@ def _migrate_chats(conn: sqlite3.Connection) -> None:
         cols = [r["name"] for r in conn.execute("PRAGMA table_info(chat_messages)").fetchall()]
         if "chat_id" not in cols:
             conn.execute("ALTER TABLE chat_messages ADD COLUMN chat_id TEXT")
+            conn.commit()
+        if "meta" not in cols:
+            conn.execute("ALTER TABLE chat_messages ADD COLUMN meta TEXT")
             conn.commit()
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_chat_chatid ON chat_messages(chat_id, created)"
@@ -333,14 +337,16 @@ def delete_chat(chat_id: str) -> int:
 
 
 def add_chat_message(chat_id: str, role: str, text: str | None = None,
-                     image_id: str | None = None, job_id: str | None = None) -> str:
+                     image_id: str | None = None, job_id: str | None = None,
+                     meta: dict | None = None) -> str:
     message_id = new_id()
     conn = connect()
     with _lock:
         conn.execute(
-            "INSERT INTO chat_messages (id, chat_id, role, text, image_id, job_id, created) "
-            "VALUES (?,?,?,?,?,?,?)",
-            (message_id, chat_id, role, text, image_id, job_id, time.time()),
+            "INSERT INTO chat_messages (id, chat_id, role, text, image_id, job_id, meta, created) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (message_id, chat_id, role, text, image_id, job_id,
+             json.dumps(meta) if meta else None, time.time()),
         )
         conn.execute("UPDATE chats SET updated=? WHERE id=?", (time.time(), chat_id))
         conn.commit()
@@ -357,6 +363,11 @@ def list_chat(chat_id: str, limit: int = 500) -> list[dict]:
     messages = []
     for row in rows:
         message = dict(row)
+        if message.get("meta"):
+            try:
+                message["meta"] = json.loads(message["meta"])
+            except Exception:
+                message["meta"] = None
         if message.get("image_id"):
             message["image"] = get_image(message["image_id"])
         messages.append(message)

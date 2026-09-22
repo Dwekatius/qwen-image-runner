@@ -339,6 +339,27 @@
         <button id="set-restart" class="ghost">Reload engine</button>
         <button id="set-stop" class="ghost">Stop engine</button>
       </div>
+      <h3>Prompt assistant (DeepSeek)</h3>
+      <label class="inline-check"><input type="checkbox" id="set-asst-enabled"> Let DeepSeek write the image prompts</label>
+      <div class="hint small muted">
+        When enabled, your chat message goes to DeepSeek first: it decides whether you want a new image
+        or an edit of the last one, writes the prompt for the image model, and can answer plain
+        questions in the chat. Without it, prompts are used exactly as you type them.
+      </div>
+      <label class="field">API key
+        <input id="set-asst-key" type="password" placeholder="sk-..." autocomplete="off">
+      </label>
+      <div class="hint small muted" id="set-asst-keyhint"></div>
+      <div class="row2">
+        <label class="field">Model <input id="set-asst-model" type="text" placeholder="deepseek-chat"></label>
+        <label class="field">Base URL <input id="set-asst-base" type="text" placeholder="https://api.deepseek.com"></label>
+      </div>
+      <div class="row2">
+        <button id="set-asst-save" class="ghost">Save</button>
+        <button id="set-asst-test" class="ghost">Test connection</button>
+      </div>
+      <div class="hint small muted" id="set-asst-status"></div>
+
       <h3>Storage</h3>
       <div class="mono-box small" id="set-storage"></div>
       <h3>About</h3>

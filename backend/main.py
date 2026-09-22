@@ -16,7 +16,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import config, db, downloader, saveas, storage
+from . import assistant, config, db, downloader, saveas, storage
 from .engine import EngineError, make_engine
 from .jobs import EventBus, JobRunner
 
@@ -398,6 +398,30 @@ async def chat_submit(body: dict) -> dict:
     requested = body.get("mode") or "auto"
     last_image = db.last_chat_image(chat["id"])
 
+    # optional prompt assistant: it writes the image prompt, or answers a plain question
+    assistant_meta: dict = {}
+    assistant_error = None
+    if assistant.config_ok(settings):
+        try:
+            history = db.list_chat(chat["id"], limit=20)
+            result = await assistant.run(settings, history, text, bool(last_image))
+            assistant_meta = {
+                "assistant_action": result.get("action") or "",
+                "assistant_prompt": result.get("prompt") or "",
+            }
+            if result.get("reply"):
+                assistant_meta["assistant_reply"] = result["reply"][:400]
+            if result["action"] == "chat":
+                db.set_chat_title_if_new(chat["id"], text)
+                db.add_chat_message(chat["id"], "user", text=text, meta=assistant_meta)
+                db.add_chat_message(chat["id"], "assistant", text=result.get("reply") or "...")
+                bus.publish({"type": "chat"})
+                return {"mode": "chat", "chat_id": chat["id"], "reply": result.get("reply")}
+            if result["action"] in ("generate", "edit"):
+                requested = result["action"]
+        except Exception as exc:  # never block image generation on the assistant
+            assistant_error = str(exc)[:200]
+
     if requested == "auto":
         mode = "generate" if (not last_image or GENERATE_RE.search(text)) else "edit"
     else:
@@ -406,7 +430,7 @@ async def chat_submit(body: dict) -> dict:
         mode = "generate"
 
     params = _normalize_params(body.get("params") or {}, mode=mode)
-    params["prompt"] = text
+    params["prompt"] = (assistant_meta.get("assistant_prompt") or "").strip() or text
     params["batch"] = 1
     params["chat"] = True
     params["chat_id"] = chat["id"]
@@ -414,8 +438,11 @@ async def chat_submit(body: dict) -> dict:
         params["refs"] = [last_image["path"]]
         params["ref_image_id"] = last_image["id"]
 
+    if assistant_error and not assistant_meta:
+        assistant_meta = {"assistant_error": assistant_error}
+
     db.set_chat_title_if_new(chat["id"], text)
-    db.add_chat_message(chat["id"], "user", text=text)
+    db.add_chat_message(chat["id"], "user", text=text, meta=assistant_meta or None)
     bus.publish({"type": "chat"})
     job_ids = await runner.submit_batch(params)
     return {
@@ -423,6 +450,8 @@ async def chat_submit(body: dict) -> dict:
         "mode": mode,
         "chat_id": chat["id"],
         "ref_image_id": last_image["id"] if mode == "edit" else None,
+        "assistant_prompt": assistant_meta.get("assistant_prompt") or None,
+        "assistant_error": assistant_error,
     }
 
 
@@ -554,7 +583,21 @@ async def delete_image(image_id: str) -> dict:
 # ------------------------------------------------------------------ settings / logs / quit
 @app.get("/api/settings")
 async def get_settings() -> dict:
-    return settings
+    return _public_settings()
+
+
+def _public_settings() -> dict:
+    """Settings that are safe to send to the browser (the API key itself is never sent)."""
+    import copy
+
+    data = copy.deepcopy(settings)
+    assistant_cfg = data.get("assistant") or {}
+    key = (assistant_cfg.get("api_key") or "").strip()
+    assistant_cfg["api_key"] = ""
+    assistant_cfg["api_key_set"] = bool(key)
+    assistant_cfg["api_key_hint"] = f"...{key[-4:]}" if len(key) >= 8 else ""
+    data["assistant"] = assistant_cfg
+    return data
 
 
 @app.put("/api/settings")
@@ -567,8 +610,36 @@ async def put_settings(body: dict) -> dict:
     autostart = body.get("engine_autostart")
     if isinstance(autostart, bool):
         settings["engine"]["autostart"] = autostart
+
+    assistant_body = body.get("assistant")
+    if isinstance(assistant_body, dict):
+        current = settings.setdefault("assistant", {})
+        if isinstance(assistant_body.get("enabled"), bool):
+            current["enabled"] = assistant_body["enabled"]
+        for key in ("base_url", "model"):
+            value = assistant_body.get(key)
+            if isinstance(value, str) and value.strip():
+                current[key] = value.strip()
+        if isinstance(assistant_body.get("api_key"), str) and assistant_body["api_key"].strip():
+            current["api_key"] = assistant_body["api_key"].strip()
+        if assistant_body.get("clear_key"):
+            current["api_key"] = ""
     config.save_settings(settings)
-    return settings
+    return _public_settings()
+
+
+@app.post("/api/assistant/test")
+async def assistant_test(body: dict | None = None) -> dict:
+    """Check the assistant credentials (accepts unsaved values from the settings form)."""
+    probe = {"assistant": dict(settings.get("assistant") or {})}
+    override = (body or {}).get("assistant")
+    if isinstance(override, dict):
+        for key in ("base_url", "model", "api_key"):
+            if isinstance(override.get(key), str) and override[key].strip():
+                probe["assistant"][key] = override[key].strip()
+    if not (probe["assistant"].get("api_key") or "").strip():
+        raise HTTPException(status_code=400, detail="enter an API key first")
+    return await assistant.test_connection(probe)
 
 
 @app.get("/api/guide")

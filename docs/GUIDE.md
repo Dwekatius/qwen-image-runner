@@ -28,6 +28,29 @@ Describe an image and send it. The result appears in the conversation and stays 
 - Progress is real: you see the actual step count, seconds per step and elapsed time. Queued jobs
   cancel instantly; an active generation stops by reloading the model (the button says so).
 
+## Prompt assistant (DeepSeek) - optional
+
+*Settings → Prompt assistant (DeepSeek)*
+
+Paste a DeepSeek API key, tick **Let DeepSeek write the image prompts**, press **Save**, then
+**Test connection**. From then on every chat message goes to DeepSeek first:
+
+- it decides whether you want a **new image** or an **edit of the last one**,
+- it writes the actual image prompt (subject, composition, lighting, style) - that prompt is what the
+  image model receives, and you can read it in the chat right under your message,
+- if you are only asking a question or brainstorming, it **answers in the chat** and no image is made.
+
+Details:
+
+- The key is stored locally in `settings.json` (gitignored) and is sent only to the provider you
+  configure. No telemetry, no third party.
+- Defaults are DeepSeek (`https://api.deepseek.com`, `deepseek-chat`). Any OpenAI-compatible endpoint
+  works - change *Base URL* and *Model*.
+- The app never sends the key back to the browser; Settings only shows a masked hint (`...464d`).
+- If the assistant is unreachable, generation still works: the app falls back to your raw prompt and
+  notes the failure in the chat.
+- DeepSeek bills per token on your own account; a typical prompt rewrite is a few hundred tokens.
+
 ## Generate view
 
 For precise work outside a conversation.

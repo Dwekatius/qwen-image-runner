@@ -7,6 +7,9 @@ All notable changes to this project are documented here. Format based on
 
 ### Fixed
 
+- Progress no longer sits on 'Queued…' during a render — the panel now shows 'Rendering…' while the
+  engine works (this engine build does not emit per-step progress; real step counts still show when
+  available).
 - Desktop shortcut now carries the app logo: `Install.bat` points the shortcut's icon at the new
   multi-size `Logo.ico`, and the app serves a `favicon.ico` fallback next to the SVG favicon.
 - Suggested image filenames fall back to `qwen-image-runner` instead of the old `local-canvas` name.

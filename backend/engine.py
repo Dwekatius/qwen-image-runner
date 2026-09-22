@@ -205,9 +205,16 @@ class RealEngine(BaseEngine):
             r = await client.get(f"{self.base}/sdcpp/v1/jobs/{engine_job}")
             r.raise_for_status()
             data = r.json()
-        if data.get("status") in ("completed", "failed", "cancelled"):
+        status = data.get("status")
+        if status in ("completed", "failed", "cancelled"):
             if self.state == "busy":
                 self.state = "ready"
+        else:
+            # This engine build does not print per-step progress; once it reports the job
+            # is generating, stop claiming it is still queued (stdout parsing can still
+            # upgrade this to phase 'sampling' with real step counts).
+            if status == "generating" and self.progress.get("phase") in (None, "queued"):
+                self.progress = {"phase": "rendering", "ts": time.time()}
         return data
 
     async def cancel(self, engine_job: str) -> tuple[int, dict]:

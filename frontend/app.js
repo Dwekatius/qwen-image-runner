@@ -149,7 +149,9 @@ function renderProgress(kind) {
     if (ui.rateEl) ui.rateEl.textContent = `${Number(p.rate || 0).toFixed(2)} ${p.unit || "s/it"}`;
   } else if (p.phase === "decoding") { label = "Decoding image…"; }
   else if (p.phase === "saving") { label = "Saving…"; }
+  else if (p.phase === "rendering") { label = "Rendering…"; }
   else if (S.active.status === "queued") { label = "Queued…"; }
+  else if (S.active?.status === "running") label = "Rendering…";
   ui.label.textContent = label;
   if (pct === null) {
     ui.fill.classList.add("indeterminate");
@@ -891,6 +893,8 @@ function fillProgress(box) {
   if (p.phase === "sampling" && p.step && p.total) { label = `Step ${p.step} / ${p.total}`; pct = (p.step / p.total) * 100; }
   else if (p.phase === "decoding") label = "Decoding image…";
   else if (p.phase === "saving") label = "Saving…";
+  else if (p.phase === "rendering") label = "Rendering…";
+  else if (S.active?.status === "running") label = "Rendering…";
   const elapsed = S.active?.startedAt ? fmtDuration((Date.now() - S.active.startedAt) / 1000) : "";
   box.innerHTML = `
     <div class="progress-bar"><div class="progress-fill ${pct === null ? "indeterminate" : ""}" style="width:${pct ?? 0}%"></div></div>

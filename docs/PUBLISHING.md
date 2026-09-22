@@ -1,6 +1,6 @@
 # Publishing checklist
 
-> **Status: PUBLISHED** — https://github.com/Dwekatious/qwen-image-runner (v1.0.0 tag + release,
+> **Status: PUBLISHED** — https://github.com/Dwekatius/qwen-image-runner (v1.0.0 tag + release,
 > created 2026-09-22). The steps below are kept as a record and for future releases.
 
 ## 1. Name

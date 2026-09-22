@@ -3,6 +3,49 @@
 All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses semantic versioning.
 
+## [1.2.0] — 2026-09-22
+
+### Added
+
+- **Settings profiles & Auto mode** — the right-hand panel can now save named profiles of the generation
+  defaults (size, steps, CFG, sampler, batch, transparency) and switch between them:
+  - **Auto** (default) lets the prompt assistant adjust the settings per prompt, starting from the app
+    baseline — *1024×1024 · 40 steps · CFG 6*, not the last profile — and reports what it used in the
+    chat as **✨ AI settings: …**;
+  - **Manual (current)** and saved profiles keep your values exactly as entered; the model never
+    changes them, and editing any control switches the panel to Manual automatically;
+  - profiles are stored in `settings.json` (gitignored), sanitized and clamped on save, and exposed at
+    `/api/profiles`, `/api/profiles/{id}` and `/api/profiles/active`.
+- **Delete chats (with cleanup)** — delete a chat from the **✕** on its sidebar entry or **Delete chat**
+  in the chat header. The confirmation dialog removes the chat's messages, its gallery images, its files
+  under `outputs/chats/<chat-id>/` and their thumbnails; **Save as…** copies you made elsewhere are never
+  touched. `DELETE /api/chats/{chat_id}?delete_images=false` keeps the images instead.
+- **Right-panel quick controls** — settings profile, prompt-assistant toggle with a masked DeepSeek key
+  field (*•••••••• saved (…hint) - type to replace*), a GPU/CPU segmented toggle that switches the engine
+  backend, and a collapsible **Generation settings** block that shows a `1024×1024 · 40 steps · cfg 6.0`
+  summary and starts collapsed in Auto mode.
+
+### Changed
+
+- **Expert prompt assistant** — rewritten system prompt: the assistant now structures scenes
+  (subject → setting → camera → lighting → style/palette), follows Qwen-Image's text-rendering
+  strengths (exact quoted text, placement and lettering style), prefers positive phrasing over
+  negations, describes quality through technique instead of “masterpiece / 8k”, and replies with strict
+  single-line JSON that includes four worked examples.
+- **Assistant-chosen generation settings** — `/api/chat/submit` accepts `auto_settings`; when DeepSeek is
+  enabled, the assistant's `settings` object is sanitized/clamped, merged into the job and returned as
+  `assistant_settings` for the chat. Manual and saved profiles ignore it. The assistant also receives
+  the current defaults as a hint so it only changes what serves the prompt.
+- `config.load_settings()` normalizes `defaults` back to the app baseline whenever `profiles.active` is
+  `auto`, so stale manual values cannot leak into Auto.
+
+### Fixed
+
+- Assistant replies in chat no longer leave a phantom progress card, and DeepSeek now only starts an
+  image job when the user actually asks for one — greetings and questions are answered in the chat.
+- Chat history is ordered deterministically (`created` + rowid), so messages created in the same second
+  keep their real order.
+
 ## [1.1.0] — 2026-09-22
 
 ### Added

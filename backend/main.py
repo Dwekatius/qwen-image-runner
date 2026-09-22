@@ -361,6 +361,205 @@ def _normalize_params(body: dict, mode: str) -> dict:
     }
 
 
+# ------------------------------------------------------------------ settings profiles
+PROFILE_SIZE_RE = re.compile(r"^(\d{3,4})x(\d{3,4})$")
+
+
+def _clamp_dim(value: int) -> int:
+    return max(256, min(4096, (int(value) // 32) * 32))
+
+
+def _sanitize_size(value, fallback: str = "1024x1024") -> str:
+    match = PROFILE_SIZE_RE.match(str(value or "").strip().lower())
+    if not match:
+        return fallback
+    return f"{_clamp_dim(int(match.group(1)))}x{_clamp_dim(int(match.group(2)))}"
+
+
+def _clamp_int(value, low: int, high: int, fallback: int) -> int:
+    try:
+        return max(low, min(high, int(float(value))))
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _clamp_float(value, low: float, high: float, fallback: float) -> float:
+    try:
+        return max(low, min(high, float(value)))
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _sanitize_profile_defaults(raw, base: dict | None = None) -> dict:
+    """Clamp a profile's defaults into the ranges the panel supports."""
+    raw = raw if isinstance(raw, dict) else {}
+    base = base if isinstance(base, dict) else {}
+    fallback = {
+        "size": _sanitize_size(base.get("size"), "1024x1024"),
+        "steps": _clamp_int(base.get("steps"), 10, 60, 40),
+        "cfg": _clamp_float(base.get("cfg"), 1.0, 10.0, 6.0),
+        "sampler": str(base.get("sampler") or "").strip()[:40] or "euler",
+        "batch": _clamp_int(base.get("batch"), 1, 4, 1),
+        "transparent": bool(base.get("transparent", False)),
+    }
+    out = dict(fallback)
+    if raw.get("size") is not None:
+        out["size"] = _sanitize_size(raw.get("size"), fallback["size"])
+    if raw.get("steps") is not None:
+        out["steps"] = _clamp_int(raw.get("steps"), 10, 60, fallback["steps"])
+    if raw.get("cfg") is not None:
+        out["cfg"] = _clamp_float(raw.get("cfg"), 1.0, 10.0, fallback["cfg"])
+    if raw.get("sampler") is not None:
+        out["sampler"] = str(raw.get("sampler")).strip()[:40] or fallback["sampler"]
+    if raw.get("batch") is not None:
+        out["batch"] = _clamp_int(raw.get("batch"), 1, 4, fallback["batch"])
+    if raw.get("transparent") is not None:
+        out["transparent"] = bool(raw.get("transparent"))
+    return out
+
+
+def _profiles_section() -> dict:
+    section = settings.setdefault("profiles", {})
+    if not isinstance(section, dict):
+        section = {}
+        settings["profiles"] = section
+    if not isinstance(section.get("items"), list):
+        section["items"] = []
+    section.setdefault("active", "auto")
+    return section
+
+
+def _find_profile(pid: str) -> dict | None:
+    for item in _profiles_section().get("items", []):
+        if isinstance(item, dict) and item.get("id") == pid:
+            return item
+    return None
+
+
+def _profiles_payload() -> dict:
+    section = _profiles_section()
+    profiles = []
+    for item in section.get("items", []):
+        if not isinstance(item, dict):
+            continue
+        profiles.append({
+            "id": str(item.get("id") or ""),
+            "name": str(item.get("name") or ""),
+            "defaults": dict(item.get("defaults") or {}),
+        })
+    return {
+        "active": section.get("active") or "auto",
+        "profiles": profiles,
+        "assistant_ready": assistant.config_ok(settings),
+        "effective": dict(settings.get("defaults") or {}),
+    }
+
+
+def _apply_assistant_settings(params: dict, raw: dict) -> dict:
+    """Merge the assistant's requested settings into normalized generation params."""
+    applied: dict = {}
+    size = raw.get("size")
+    if size:
+        canonical = _sanitize_size(size, "")
+        if canonical:
+            width, height = (int(value) for value in canonical.split("x"))
+            params["width"], params["height"] = width, height
+            applied["size"] = canonical
+    if raw.get("steps") is not None:
+        params["steps"] = _clamp_int(raw.get("steps"), 10, 60, params.get("steps", 40))
+        applied["steps"] = params["steps"]
+    if raw.get("cfg") is not None:
+        params["cfg"] = _clamp_float(raw.get("cfg"), 1.0, 10.0, params.get("cfg", 6.0))
+        applied["cfg"] = params["cfg"]
+    if isinstance(raw.get("transparent"), bool):
+        params["transparent"] = raw["transparent"]
+        applied["transparent"] = raw["transparent"]
+    return applied
+
+
+@app.get("/api/profiles")
+async def profiles_get() -> dict:
+    return _profiles_payload()
+
+
+@app.post("/api/profiles")
+async def profiles_create(body: dict) -> dict:
+    name = str((body or {}).get("name") or "").strip()
+    if not 1 <= len(name) <= 40:
+        raise HTTPException(status_code=400, detail="profile name must be 1-40 characters")
+    section = _profiles_section()
+    item = {
+        "id": "p_" + secrets.token_hex(4),
+        "name": name,
+        "defaults": _sanitize_profile_defaults((body or {}).get("defaults"), settings.get("defaults")),
+    }
+    section["items"].append(item)
+    section["active"] = item["id"]
+    settings["defaults"] = dict(item["defaults"])
+    config.save_settings(settings)
+    bus.publish({"type": "profiles", "active": item["id"]})
+    return _profiles_payload()
+
+
+@app.put("/api/profiles/{pid}")
+async def profiles_update(pid: str, body: dict) -> dict:
+    item = _find_profile(pid)
+    if item is None:
+        raise HTTPException(status_code=404, detail="unknown profile")
+    if "name" in (body or {}):
+        name = str(body.get("name") or "").strip()
+        if not 1 <= len(name) <= 40:
+            raise HTTPException(status_code=400, detail="profile name must be 1-40 characters")
+        item["name"] = name
+    if isinstance((body or {}).get("defaults"), dict):
+        item["defaults"] = _sanitize_profile_defaults(body["defaults"], item.get("defaults"))
+    if _profiles_section().get("active") == pid:
+        settings["defaults"] = dict(item["defaults"])
+    config.save_settings(settings)
+    bus.publish({"type": "profiles", "active": _profiles_section().get("active")})
+    return _profiles_payload()
+
+
+@app.delete("/api/profiles/{pid}")
+async def profiles_delete(pid: str) -> dict:
+    section = _profiles_section()
+    before = len(section["items"])
+    section["items"] = [item for item in section["items"]
+                         if not (isinstance(item, dict) and item.get("id") == pid)]
+    if len(section["items"]) == before:
+        raise HTTPException(status_code=404, detail="unknown profile")
+    if section.get("active") == pid:
+        # Deleting the active profile falls back to Auto and the app baseline,
+        # exactly like selecting Auto in the panel.
+        section["active"] = "auto"
+        settings["defaults"] = json.loads(json.dumps(config.DEFAULT_SETTINGS["defaults"]))
+    config.save_settings(settings)
+    bus.publish({"type": "profiles", "active": section.get("active")})
+    return _profiles_payload()
+
+
+@app.post("/api/profiles/active")
+async def profiles_set_active(body: dict) -> dict:
+    pid = str((body or {}).get("id") or "").strip()
+    section = _profiles_section()
+    if pid == "auto":
+        # Auto is the app baseline: drop any profile/manual tweaks
+        section["active"] = "auto"
+        settings["defaults"] = json.loads(json.dumps(config.DEFAULT_SETTINGS["defaults"]))
+    elif pid == "manual":
+        section["active"] = "manual"
+    else:
+        item = _find_profile(pid)
+        if item is None:
+            raise HTTPException(status_code=404, detail="unknown profile")
+        item["defaults"] = _sanitize_profile_defaults(item.get("defaults"), settings.get("defaults"))
+        section["active"] = pid
+        settings["defaults"] = dict(item["defaults"])
+    config.save_settings(settings)
+    bus.publish({"type": "profiles", "active": pid})
+    return _profiles_payload()
+
+
 # ------------------------------------------------------------------ chats
 @app.get("/api/chats")
 async def chats_list() -> dict:
@@ -375,12 +574,46 @@ async def chats_create(body: dict | None = None) -> dict:
 
 
 @app.delete("/api/chats/{chat_id}")
-async def chats_delete(chat_id: str) -> dict:
-    deleted = db.delete_chat(chat_id)
-    if not deleted:
+async def chats_delete(chat_id: str, delete_images: bool = True) -> dict:
+    if not db.get_chat(chat_id):
         raise HTTPException(status_code=404, detail="unknown chat")
+    images_deleted = 0
+    images_kept = 0
+    if delete_images:
+        chat_dir = (config.OUTPUTS_DIR / "chats" / chat_id).resolve()
+        thumbs_dir = Path(config.THUMBS_DIR).resolve()
+        for image_id in db.chat_image_ids(chat_id):
+            img = db.get_image(image_id)
+            if not img:
+                continue
+            path = storage.resolve_path(img["path"])
+            try:
+                inside_chat = path.resolve().is_relative_to(chat_dir)
+            except OSError:
+                inside_chat = False
+            if not inside_chat:
+                # the file lives outside this chat's folder (e.g. saved elsewhere): keep it
+                images_kept += 1
+                continue
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            if img.get("thumb"):
+                thumb = storage.resolve_path(img["thumb"])
+                try:
+                    if thumb.resolve().is_relative_to(thumbs_dir):
+                        thumb.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            db.delete_image(image_id)
+            images_deleted += 1
+    else:
+        images_kept = len(db.chat_image_ids(chat_id))
+    deleted = db.delete_chat(chat_id)
     bus.publish({"type": "chat"})
-    return {"ok": True, "deleted": deleted}
+    return {"ok": True, "deleted": deleted, "images_deleted": images_deleted,
+            "images_kept": images_kept}
 
 
 @app.get("/api/chat")
@@ -396,27 +629,34 @@ async def chat_submit(body: dict) -> dict:
         raise HTTPException(status_code=400, detail="message is required")
     chat = db.get_chat(body.get("chat_id") or "") or db.latest_chat() or db.create_chat()
     requested = body.get("mode") or "auto"
+    auto_settings = bool(body.get("auto_settings"))
+    assistant_ok = assistant.config_ok(settings)
     last_image = db.last_chat_image(chat["id"])
 
     # optional prompt assistant: it writes the image prompt, or answers a plain question
     assistant_meta: dict = {}
     assistant_error = None
-    if assistant.config_ok(settings):
+    assistant_settings_raw: dict = {}
+    if assistant_ok:
         try:
             history = db.list_chat(chat["id"], limit=20)
-            result = await assistant.run(settings, history, text, bool(last_image))
+            current = settings.get("defaults") if auto_settings else None
+            result = await assistant.run(settings, history, text, bool(last_image), current=current)
             assistant_meta = {
                 "assistant_action": result.get("action") or "",
                 "assistant_prompt": result.get("prompt") or "",
             }
             if result.get("reply"):
                 assistant_meta["assistant_reply"] = result["reply"][:400]
+            if isinstance(result.get("settings"), dict):
+                assistant_settings_raw = result["settings"]
             if result["action"] == "chat":
                 db.set_chat_title_if_new(chat["id"], text)
                 db.add_chat_message(chat["id"], "user", text=text, meta=assistant_meta)
                 db.add_chat_message(chat["id"], "assistant", text=result.get("reply") or "...")
                 bus.publish({"type": "chat"})
-                return {"mode": "chat", "chat_id": chat["id"], "reply": result.get("reply")}
+                return {"mode": "chat", "chat_id": chat["id"], "reply": result.get("reply"),
+                        "assistant_settings": None}
             if result["action"] in ("generate", "edit"):
                 requested = result["action"]
         except Exception as exc:  # never block image generation on the assistant
@@ -430,6 +670,11 @@ async def chat_submit(body: dict) -> dict:
         mode = "generate"
 
     params = _normalize_params(body.get("params") or {}, mode=mode)
+    # the assistant may only touch settings when the user is on the Auto profile
+    if auto_settings and assistant_ok and assistant_settings_raw:
+        applied = _apply_assistant_settings(params, assistant_settings_raw)
+        if applied:
+            assistant_meta["assistant_settings"] = applied
     params["prompt"] = (assistant_meta.get("assistant_prompt") or "").strip() or text
     params["batch"] = 1
     params["chat"] = True
@@ -452,6 +697,7 @@ async def chat_submit(body: dict) -> dict:
         "ref_image_id": last_image["id"] if mode == "edit" else None,
         "assistant_prompt": assistant_meta.get("assistant_prompt") or None,
         "assistant_error": assistant_error,
+        "assistant_settings": assistant_meta.get("assistant_settings"),
     }
 
 
@@ -603,7 +849,10 @@ def _public_settings() -> dict:
 @app.put("/api/settings")
 async def put_settings(body: dict) -> dict:
     defaults = body.get("defaults")
-    if isinstance(defaults, dict):
+    # Auto owns settings["defaults"]: selecting Auto resets it to the app baseline, so a
+    # debounced manual-edit PUT must never overwrite that baseline.
+    active_profile = (settings.get("profiles") or {}).get("active", "auto")
+    if isinstance(defaults, dict) and active_profile != "auto":
         for key in ("size", "steps", "cfg", "sampler", "batch", "transparent"):
             if key in defaults:
                 settings["defaults"][key] = defaults[key]

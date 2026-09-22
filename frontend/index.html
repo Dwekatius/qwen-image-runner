@@ -14,7 +14,7 @@
   <div class="brand">
     <img class="brand-logo" src="/logo.png" alt="">
     <span class="brand-name">Qwen Image Runner</span>
-    <span class="brand-ver" id="brand-ver">v1.0.0</span>
+    <span class="brand-ver" id="brand-ver">v1.2.0</span>
   </div>
   <div class="status-chips">
     <span id="engine-chip" class="chip" title="Engine state"><span class="dot" id="engine-dot"></span><span id="engine-label">Engine: starting…</span></span>
@@ -57,6 +57,7 @@
       <div class="chat-head">
         <h2>Chat</h2>
         <div class="chat-head-actions">
+          <button id="btn-chat-delete" class="ghost small" disabled>Delete chat</button>
           <button id="btn-chat-clear" class="ghost small">＋ New chat</button>
         </div>
       </div>
@@ -206,6 +207,58 @@
 
   <aside id="params">
     <section class="panel-section">
+      <h3>Settings profile</h3>
+      <label class="field">Profile
+        <select id="profile-select">
+          <option value="auto">Auto — AI adjusts settings</option>
+          <option value="manual">Manual (current)</option>
+        </select>
+      </label>
+      <div class="row2">
+        <button id="profile-save" class="ghost small">Save as…</button>
+        <button id="profile-update" class="ghost small" disabled>Update</button>
+      </div>
+      <div id="profile-name-row" class="hidden">
+        <div class="side-key-row">
+          <input id="profile-name" type="text" maxlength="40" placeholder="Profile name" autocomplete="off">
+          <button id="profile-name-ok" class="ghost small">Save</button>
+          <button id="profile-name-cancel" class="ghost small" title="Cancel">✕</button>
+        </div>
+      </div>
+      <button id="profile-delete" class="ghost small" disabled>Delete</button>
+      <div class="hint small muted" id="profile-hint"></div>
+    </section>
+
+    <section class="panel-section">
+      <h3>Prompt assistant</h3>
+      <label class="inline-check"><input type="checkbox" id="side-asst-enabled"> DeepSeek prompts</label>
+      <div id="side-asst-key-wrap" class="hidden">
+        <div class="field">DeepSeek API key
+          <div class="side-key-row">
+            <input id="side-asst-key" type="password" placeholder="sk-..." autocomplete="off">
+            <button id="side-asst-save" class="ghost small">Save</button>
+          </div>
+        </div>
+        <div class="hint small muted" id="side-asst-status"></div>
+      </div>
+    </section>
+
+    <button id="settings-fields-toggle" class="collapse-head" aria-expanded="true">
+      <span>Generation settings</span><span class="chev">▾</span>
+      <span id="settings-fields-summary" class="muted small"></span>
+    </button>
+    <div id="settings-fields">
+
+    <section class="panel-section">
+      <h3>Compute</h3>
+      <div class="seg-toggle" id="side-device" role="group" aria-label="Compute device">
+        <button type="button" id="side-device-gpu" class="seg-btn" aria-pressed="false">GPU</button>
+        <button type="button" id="side-device-cpu" class="seg-btn" aria-pressed="false">CPU</button>
+      </div>
+      <div class="hint small muted" id="side-device-hint">Checking compute…</div>
+    </section>
+
+    <section class="panel-section">
       <h3>Image</h3>
       <label class="field">Size
         <select id="size-preset">
@@ -273,6 +326,7 @@
         <button id="btn-engine-stop" class="ghost small">Stop</button>
       </div>
     </section>
+    </div>
   </aside>
 </div>
 
@@ -377,6 +431,20 @@
     <div class="modal-head"><h2>Engine logs</h2><button class="icon-btn" data-close="logs-modal">✕</button></div>
     <div class="modal-body">
       <pre id="logs-pre" class="logs"></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== DELETE CHAT MODAL ==================== -->
+<div id="delete-chat-modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head"><h2>Delete chat?</h2><button class="icon-btn" data-close="delete-chat-modal">✕</button></div>
+    <div class="modal-body">
+      <div id="delete-chat-text" class="muted"></div>
+      <div class="row2">
+        <button id="btn-delete-chat-cancel" class="ghost" data-close="delete-chat-modal">Cancel</button>
+        <button id="btn-delete-chat-confirm" class="danger">Delete</button>
+      </div>
     </div>
   </div>
 </div>

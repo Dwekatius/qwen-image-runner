@@ -22,18 +22,23 @@ Describe an image and send it. The result appears in the conversation and stays 
 - **New images need a hint.** Start with *generate / create / draw / new image* and the app makes a
   fresh image instead of editing. The context bar above the input always shows which mode will be used
   (“Editing the image above” / “Starting a new image”).
-- **New chat** (`＋ New chat`) opens a fresh conversation. Nothing is deleted: every chat keeps its
-  messages and its own images, and you can reopen any of them from the sidebar.
+- **New chat** (`＋ New chat`) opens a fresh conversation. Every chat keeps its messages and its own
+  images, and you can reopen any of them from the sidebar.
+- **Delete a chat** with the **✕** on its sidebar entry or **Delete chat** in the chat header. The chat
+  and the images it generated (gallery entries, files and thumbnails) are removed; copies you made with
+  **Save as…** are kept.
 - Every result has **Save as…**, **Use as input** and **Reuse settings**.
 - Progress is real: you see the actual step count, seconds per step and elapsed time. Queued jobs
   cancel instantly; an active generation stops by reloading the model (the button says so).
 
 ## Prompt assistant (DeepSeek) - optional
 
-*Settings → Prompt assistant (DeepSeek)*
+*Settings → Prompt assistant (DeepSeek)*, or the **Prompt assistant** section in the right-hand panel.
 
-Paste a DeepSeek API key, tick **Let DeepSeek write the image prompts**, press **Save**, then
-**Test connection**. From then on every chat message goes to DeepSeek first:
+Paste a DeepSeek API key, tick **DeepSeek prompts** (or **Let DeepSeek write the image prompts** in
+Settings), press **Save**, then **Test connection**. The stored key is never shown again — the field
+reads `•••••••• saved (…hint)` and typing replaces it. From then on every chat message goes to
+DeepSeek first:
 
 - it decides whether you want a **new image** or an **edit of the last one**,
 - it writes the actual image prompt (subject, composition, lighting, style) - that prompt is what the
@@ -50,6 +55,22 @@ Details:
 - If the assistant is unreachable, generation still works: the app falls back to your raw prompt and
   notes the failure in the chat.
 - DeepSeek bills per token on your own account; a typical prompt rewrite is a few hundred tokens.
+
+## Settings profiles & Auto mode
+
+The **Settings profile** section in the right-hand panel decides who owns the generation settings
+(size, steps, CFG, sampler, batch, transparency):
+
+- **Auto** (default) — the prompt assistant adjusts the settings for each prompt and the app reports
+  what was used in the chat as *✨ AI settings: …*. Selecting Auto resets the fallback settings to the
+  app baseline (1024×1024, 40 steps, CFG 6), not to the last profile's values. It needs DeepSeek
+  prompts enabled with an API key; the panel says so until then. The **Generation settings** block
+  starts collapsed in Auto mode and shows a summary of the values it is about to use.
+- **Manual (current)** — your values are used exactly as entered; the model never changes them. Editing
+  any control in the panel switches the profile to Manual automatically.
+- **Saved profiles** — **Save as…** stores the current defaults under a name, **Update** overwrites the
+  active one and **Delete** removes it (falling back to Auto). Switching a profile applies its saved
+  values to the panel immediately.
 
 ## Generate view
 
@@ -120,7 +141,9 @@ Practical advice for CPU:
 - If you have any modern GPU (even integrated), try **Vulkan** first — it is usually much faster than CPU.
 
 The app shows a warning in the Engine panel whenever the CPU backend is active, and the size hint
-switches to CPU timings.
+switches to CPU timings. The **GPU / CPU** segmented toggle in the right-hand panel also switches the
+engine backend directly: it picks an installed GPU backend (CUDA first, then Vulkan) and never
+downloads anything — install or switch builds in *Settings → Engine backend*.
 
 ## Model files
 

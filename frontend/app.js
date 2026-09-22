@@ -20,8 +20,17 @@ const S = {
   chatId: null,          // active conversation id
   lastChatImage: null,   // last assistant image (edit context)
   chatForce: null,       // 'generate' | 'edit' | null (=auto)
+  pendingDeleteChat: null,
   settings: null,
   assistant: {},
+  profiles: [],
+  profileActive: "auto",
+  profileBase: null,      // saved profile the current panel values were derived from
+  profileAssistantReady: false,
+  settingsCollapsed: false,
+  suppressManualEdit: false,
+  manualEditTimer: null,
+  profileConfirmTimer: null,
   samplers: ["euler"],
   backends: [],
   backendCurrent: null,
@@ -370,13 +379,17 @@ function collectParams() {
 }
 
 function applySettings(p) {
-  if (p.width && p.height) setSize(p.width, p.height);
-  if (p.steps) { $("#steps").value = p.steps; $("#steps-val").textContent = p.steps; }
-  if (p.cfg) { $("#cfg").value = p.cfg; $("#cfg-val").textContent = Number(p.cfg).toFixed(1); }
-  if (p.sampler) $("#sampler").value = p.sampler;
-  if (p.seed !== undefined) $("#seed").value = p.seed;
-  if (p.transparent !== undefined) $("#btn-transparent").classList.toggle("active", !!p.transparent);
-  updateSizeHint();
+  withSuppressedEdits(() => {
+    if (p.width && p.height) setSize(p.width, p.height);
+    if (p.steps) { $("#steps").value = p.steps; $("#steps-val").textContent = p.steps; }
+    if (p.cfg) { $("#cfg").value = p.cfg; $("#cfg-val").textContent = Number(p.cfg).toFixed(1); }
+    if (p.sampler) $("#sampler").value = p.sampler;
+    if (p.seed !== undefined) $("#seed").value = p.seed;
+    if (p.transparent !== undefined) $("#btn-transparent").classList.toggle("active", !!p.transparent);
+    updateSizeHint();
+    updateChatHints();
+  });
+  updateSettingsSummary();
 }
 
 function setSize(w, h) {
@@ -405,12 +418,234 @@ function updateSizeHint() {
     $("#size-hint").textContent = `~${estimateMinutes(w, h, steps).toFixed(1)} min on RTX 5070 Ti @ ${steps} steps`;
   }
   updateChatHints();
+  updateSettingsSummary();
+}
+
+function updateSettingsSummary() {
+  const el = $("#settings-fields-summary");
+  if (!el) return;
+  const w = Number($("#width").value) || 1024;
+  const h = Number($("#height").value) || 1024;
+  const steps = Number($("#steps").value) || 40;
+  const cfg = Number($("#cfg").value) || 6;
+  el.textContent = `${w}×${h} · ${steps} steps · cfg ${cfg.toFixed(1)}`;
+}
+
+function setSettingsCollapsed(collapsed) {
+  S.settingsCollapsed = !!collapsed;
+  const head = $("#settings-fields-toggle");
+  const body = $("#settings-fields");
+  if (head) head.setAttribute("aria-expanded", String(!S.settingsCollapsed));
+  if (body) body.classList.toggle("collapsed", S.settingsCollapsed);
 }
 
 function requireReady() {
   if (S.engine.state === "ready" || S.engine.state === "busy") return true;
   toast("Engine is not ready yet — check the engine panel", "error");
   return false;
+}
+
+/* ------------------------------------------------------------ settings profiles */
+function withSuppressedEdits(fn) {
+  S.suppressManualEdit = true;
+  try { return fn(); } finally { S.suppressManualEdit = false; }
+}
+
+function profileById(id) {
+  return (S.profiles || []).find((p) => p.id === id) || null;
+}
+
+function currentProfileDefaults() {
+  const p = collectParams();
+  return {
+    size: `${p.width}x${p.height}`,
+    steps: p.steps,
+    cfg: p.cfg,
+    sampler: p.sampler,
+    batch: p.batch,
+    transparent: p.transparent,
+  };
+}
+
+function renderProfiles() {
+  const sel = $("#profile-select");
+  if (!sel) return;
+  const active = S.profileActive || "auto";
+  sel.innerHTML = [
+    `<option value="auto">Auto — AI adjusts settings</option>`,
+    `<option value="manual">Manual (current)</option>`,
+    ...(S.profiles || []).map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`),
+  ].join("");
+  sel.value = active;
+  const isSaved = !!profileById(active);
+  const base = profileById(S.profileBase);
+  const upd = $("#profile-update"), del = $("#profile-delete");
+  if (upd) {
+    upd.disabled = !base;
+    upd.title = base ? `Update “${base.name}”` : "";
+  }
+  if (del) {
+    // Reset any armed "Confirm?" state: switching profiles must not make the next click delete.
+    if (S.profileConfirmTimer) clearTimeout(S.profileConfirmTimer);
+    delete del.dataset.confirm;
+    del.textContent = "Delete";
+    del.disabled = !(base || isSaved);
+  }
+  const hint = $("#profile-hint");
+  if (!hint) return;
+  hint.classList.remove("warn");
+  if (active === "auto") {
+    if (S.profileAssistantReady) {
+      hint.textContent = "AI picks the best settings for each prompt.";
+    } else {
+      hint.classList.add("warn");
+      hint.textContent = "⚠ Auto needs DeepSeek prompts enabled with an API key — using the current settings until then.";
+    }
+  } else if (active === "manual") {
+    hint.textContent = base
+      ? `Edited from profile “${base.name}” — Update saves it, Save as… creates a new one.`
+      : "Manual — the model will not change these settings.";
+  } else {
+    const p = profileById(active);
+    hint.textContent = p
+      ? `Profile “${p.name}” — the model will not change these settings.`
+      : "Manual — the model will not change these settings.";
+  }
+}
+
+function applyProfilesPayload(res) {
+  if (!res) return;
+  S.profiles = res.profiles || [];
+  S.profileActive = res.active || "auto";
+  S.profileAssistantReady = !!res.assistant_ready;
+  renderProfiles();
+}
+
+async function loadProfiles() {
+  try {
+    applyProfilesPayload(await api("/api/profiles"));
+    if (profileById(S.profileActive)) S.profileBase = S.profileActive;
+    renderProfiles();
+  } catch { /* keep the current state */ }
+}
+
+async function selectProfile(id) {
+  if (S.manualEditTimer) clearTimeout(S.manualEditTimer);
+  try {
+    const res = await api("/api/profiles/active", { method: "POST", json: { id } });
+    applyProfilesPayload(res);
+    withSuppressedEdits(() => applyDefaults(res.effective || {}));
+    S.profileBase = profileById(id) ? id : null;
+    setSettingsCollapsed(id === "auto");
+    renderProfiles();
+    if (id === "auto" && !S.profileAssistantReady) {
+      toast("⚠ Auto needs DeepSeek prompts enabled with an API key — using the current settings for now.", "error", 6500);
+    }
+  } catch (e) {
+    toast("Profile switch failed: " + e.message, "error");
+    loadProfiles();
+  }
+}
+
+async function saveProfile() {
+  const name = $("#profile-name").value.trim();
+  if (!name) { toast("Type a profile name first", "error"); return; }
+  try {
+    const res = await api("/api/profiles", { method: "POST", json: { name, defaults: currentProfileDefaults() } });
+    applyProfilesPayload(res);
+    S.profileBase = S.profileActive;
+    renderProfiles();
+    $("#profile-name-row").classList.add("hidden");
+    $("#profile-name").value = "";
+    toast(`Profile “${name}” saved`, "ok");
+  } catch (e) { toast("Save profile failed: " + e.message, "error"); }
+}
+
+async function updateProfile() {
+  const target = profileById(S.profileActive) || profileById(S.profileBase);
+  if (!target) return;
+  try {
+    await api(`/api/profiles/${encodeURIComponent(target.id)}`, {
+      method: "PUT",
+      json: { defaults: currentProfileDefaults() },
+    });
+    const res = await api("/api/profiles/active", { method: "POST", json: { id: target.id } });
+    applyProfilesPayload(res);
+    withSuppressedEdits(() => applyDefaults(res.effective || {}));
+    S.profileBase = target.id;
+    renderProfiles();
+    toast(`Profile “${target.name}” updated`, "ok");
+  } catch (e) { toast("Update failed: " + e.message, "error"); }
+}
+
+function deleteProfile() {
+  const p = profileById(S.profileActive) || profileById(S.profileBase);
+  if (!p) return;
+  const btn = $("#profile-delete");
+  if (!btn.dataset.confirm) {
+    btn.dataset.confirm = "1";
+    btn.textContent = "Confirm?";
+    if (S.profileConfirmTimer) clearTimeout(S.profileConfirmTimer);
+    S.profileConfirmTimer = setTimeout(() => {
+      delete btn.dataset.confirm;
+      btn.textContent = "Delete";
+    }, 3000);
+    return;
+  }
+  clearTimeout(S.profileConfirmTimer);
+  delete btn.dataset.confirm;
+  btn.textContent = "Delete";
+  api(`/api/profiles/${encodeURIComponent(p.id)}`, { method: "DELETE" })
+    .then((res) => {
+      applyProfilesPayload(res);
+      withSuppressedEdits(() => applyDefaults(res.effective || {}));
+      setSettingsCollapsed((res.active || "auto") === "auto");
+      toast(`Profile “${p.name}” deleted`, "ok");
+    })
+    .catch((e) => toast("Delete failed: " + e.message, "error"));
+}
+
+async function markManualEdit() {
+  if (S.suppressManualEdit) return;
+  if (S.profileActive !== "manual") {
+    S.profileActive = "manual";
+    renderProfiles();
+    try {
+      const res = await api("/api/profiles/active", { method: "POST", json: { id: "manual" } });
+      S.profiles = res.profiles || S.profiles;
+      S.profileActive = res.active || "manual";
+      S.profileAssistantReady = !!res.assistant_ready;
+    } catch (e) {
+      toast("Could not mark settings as manual: " + e.message, "error");
+    }
+    renderProfiles();
+  }
+  if (S.manualEditTimer) clearTimeout(S.manualEditTimer);
+  S.manualEditTimer = setTimeout(() => {
+    api("/api/settings", { method: "PUT", json: { defaults: currentProfileDefaults() } }).catch(() => {});
+  }, 650);
+}
+
+function assistantSettingsText(s) {
+  if (!s || typeof s !== "object") return "";
+  const bits = [];
+  if (s.size) bits.push(String(s.size).replace("x", "×"));
+  if (s.steps !== undefined && s.steps !== null) bits.push(`${s.steps} steps`);
+  if (s.cfg !== undefined && s.cfg !== null) bits.push(`cfg ${Number(s.cfg).toFixed(1)}`);
+  if (s.transparent === true) bits.push("transparent");
+  return bits.length ? `✨ AI settings: ${bits.join(" · ")}` : "";
+}
+
+function applyAssistantSettings(s) {
+  const patch = {};
+  if (s.size) {
+    const [w, h] = String(s.size).split("x").map(Number);
+    if (w && h) { patch.width = w; patch.height = h; }
+  }
+  if (s.steps !== undefined && s.steps !== null) patch.steps = s.steps;
+  if (s.cfg !== undefined && s.cfg !== null) patch.cfg = s.cfg;
+  if (s.transparent !== undefined && s.transparent !== null) patch.transparent = s.transparent;
+  if (Object.keys(patch).length) applySettings(patch);
 }
 
 /* ------------------------------------------------------------ edit */
@@ -489,7 +724,45 @@ function renderChats() {
         <div class="hi-sub">${c.image_count || 0} image${(c.image_count === 1) ? "" : "s"} · ${when}</div>
       </div>`;
     item.onclick = () => { switchView("chat"); loadChat(c.id); };
+    const del = document.createElement("button");
+    del.className = "chat-del";
+    del.type = "button";
+    del.title = "Delete chat";
+    del.textContent = "✕";
+    del.onclick = (e) => { e.stopPropagation(); askDeleteChat(c.id); };
+    item.appendChild(del);
     el.appendChild(item);
+  }
+}
+
+function askDeleteChat(chatId) {
+  const chat = (S.chats || []).find((c) => c.id === chatId);
+  if (!chat) return;
+  S.pendingDeleteChat = chat.id;
+  const count = chat.image_count || 0;
+  $("#delete-chat-text").textContent =
+    `Delete “${chat.title || "Chat"}”? This removes ${count} image(s) it created from the gallery. ` +
+    "Images you saved to your own folders are kept.";
+  $("#delete-chat-modal").classList.remove("hidden");
+}
+
+async function confirmDeleteChat() {
+  const chatId = S.pendingDeleteChat;
+  if (!chatId) return;
+  S.pendingDeleteChat = null;
+  $("#delete-chat-modal").classList.add("hidden");
+  try {
+    const res = await api(`/api/chats/${encodeURIComponent(chatId)}`, { method: "DELETE" });
+    await loadChats();
+    await refreshGallery();
+    if (S.chatId === chatId) {
+      await loadChat();
+      renderChat();
+    }
+    const removed = res.images_deleted ?? 0;
+    toast(`Chat deleted — ${removed} image${removed === 1 ? "" : "s"} removed`, "ok");
+  } catch (e) {
+    toast("Delete chat failed: " + e.message, "error");
   }
 }
 
@@ -515,10 +788,12 @@ function renderChat() {
   const prevTop = scroller.scrollTop;
   wrap.innerHTML = "";
   $("#chat-empty").classList.toggle("hidden", S.chat.length > 0);
+  const delBtn = $("#btn-chat-delete");
+  if (delBtn) delBtn.disabled = !S.chatId;
   for (const m of S.chat) {
     wrap.appendChild(m.role === "user" ? chatUserEl(m) : chatAssistantEl(m));
   }
-  if (S.active && S.active.kind === "chat") wrap.appendChild(progressSlot());
+  if (S.active && S.active.kind === "chat" && S.active.id) wrap.appendChild(progressSlot());
   if (wasNearBottom) scroller.scrollTop = scroller.scrollHeight;
   else scroller.scrollTop = Math.min(prevTop, Math.max(0, scroller.scrollHeight - scroller.clientHeight));
 }
@@ -542,6 +817,13 @@ function chatUserEl(m) {
     note.title = meta.assistant_prompt;
     const label = meta.assistant_action === "edit" ? "edit" : "prompt";
     note.textContent = `✨ DeepSeek ${label}: ${meta.assistant_prompt.length > 160 ? meta.assistant_prompt.slice(0, 160) + "…" : meta.assistant_prompt}`;
+    el.appendChild(note);
+  }
+  const settingsText = assistantSettingsText(meta.assistant_settings);
+  if (settingsText) {
+    const note = document.createElement("div");
+    note.className = "chat-note";
+    note.textContent = settingsText;
     el.appendChild(note);
   }
   if (meta.assistant_error) {
@@ -672,11 +954,23 @@ async function sendChat() {
   try {
     const res = await api("/api/chat/submit", {
       method: "POST",
-      json: { text, mode: S.chatForce || "auto", params: collectParams(), chat_id: S.chatId },
+      json: {
+        text,
+        mode: S.chatForce || "auto",
+        params: collectParams(),
+        chat_id: S.chatId,
+        auto_settings: S.profileActive === "auto",
+      },
     });
     input.value = "";
     S.chatForce = null;
-    setActive({ id: res.job, kind: "chat", status: "queued", progress: {} });
+    if (res.assistant_settings) applyAssistantSettings(res.assistant_settings);
+    if (res.job) {
+      setActive({ id: res.job, kind: "chat", status: "queued", progress: {} });
+    } else {
+      // the assistant answered in chat - there is no image job to track
+      clearActive();
+    }
     await loadChats();
     await loadChat(res.chat_id || S.chatId);
     updateChatContext();
@@ -703,6 +997,8 @@ async function saveAssistantSettings() {
     if (key) payload.assistant.api_key = key;
     const res = await api("/api/settings", { method: "PUT", json: payload });
     S.assistant = res.assistant || {};
+    syncAssistantSide();
+    await loadProfiles();
     $("#set-asst-key").value = "";
     $("#set-asst-keyhint").textContent = S.assistant.api_key_set
       ? "A key is stored locally in settings.json (gitignored - never sent anywhere except your provider)."
@@ -732,6 +1028,99 @@ async function testAssistant() {
   } catch (e) {
     status.textContent = "Failed: " + e.message;
   }
+}
+
+/* ------------------------------------------------------------ side panel: prompt assistant */
+function syncAssistantSide(focusKey = false) {
+  const toggle = $("#side-asst-enabled");
+  if (!toggle) return;
+  const a = S.assistant || {};
+  toggle.checked = !!a.enabled;
+  $("#side-asst-key-wrap").classList.toggle("hidden", !a.enabled);
+  const input = $("#side-asst-key");
+  input.value = "";
+  input.placeholder = a.api_key_set
+    ? `•••••••• saved (${a.api_key_hint}) - type to replace`
+    : "sk-...";
+  const status = $("#side-asst-status");
+  if (a.enabled && !a.api_key_set) status.textContent = "Add your DeepSeek API key to enable prompt writing.";
+  else if (a.api_key_set) status.textContent = `Key stored (${a.api_key_hint}) - ready to write prompts.`;
+  else status.textContent = "";
+  if (focusKey && a.enabled && !a.api_key_set) input.focus();
+  updateChatHints();
+}
+
+async function setAssistantEnabledSide(enabled) {
+  const toggle = $("#side-asst-enabled");
+  try {
+    const res = await api("/api/settings", { method: "PUT", json: { assistant: { enabled } } });
+    S.assistant = res.assistant || {};
+    syncAssistantSide(enabled);
+    await loadProfiles();
+    toast(enabled ? "DeepSeek prompts enabled" : "DeepSeek prompts disabled", "ok", 2600);
+  } catch (e) {
+    toggle.checked = !enabled;
+    toast("Could not update the prompt assistant: " + e.message, "error");
+  }
+}
+
+async function saveAssistantKeySide() {
+  const input = $("#side-asst-key");
+  const value = input.value.trim();
+  if (!value) {
+    $("#side-asst-status").textContent = "Type your DeepSeek API key first.";
+    input.focus();
+    return;
+  }
+  try {
+    const res = await api("/api/settings", { method: "PUT", json: { assistant: { api_key: value } } });
+    S.assistant = res.assistant || {};
+    input.value = "";
+    syncAssistantSide();
+    await loadProfiles();
+    toast("DeepSeek API key saved", "ok");
+  } catch (e) {
+    toast("Could not save the API key: " + e.message, "error");
+  }
+}
+
+/* ------------------------------------------------------------ side panel: compute toggle */
+function updateComputeToggle() {
+  const gpuBtn = $("#side-device-gpu");
+  const cpuBtn = $("#side-device-cpu");
+  if (!gpuBtn || !cpuBtn) return;
+  const cpu = S.backendCurrent === "cpu";
+  gpuBtn.classList.toggle("active", !cpu);
+  cpuBtn.classList.toggle("active", cpu);
+  gpuBtn.setAttribute("aria-pressed", String(!cpu));
+  cpuBtn.setAttribute("aria-pressed", String(cpu));
+  const hint = $("#side-device-hint");
+  if (!hint) return;
+  if (cpu) hint.textContent = "CPU only — expect slow renders.";
+  else {
+    const b = (S.backends || []).find((x) => x.id === S.backendCurrent);
+    hint.textContent = `GPU · ${b ? b.label : (S.backendCurrent || "GPU")}`;
+  }
+}
+
+function preferGpuBackend() {
+  const backends = S.backends || [];
+  const installed = (id) => backends.some((b) => b.id === id && b.installed);
+  if (installed("cuda")) return "cuda";
+  if (installed("vulkan")) return "vulkan";
+  const nonCpu = backends.filter((b) => b.id !== "cpu");
+  if (nonCpu.length) return (nonCpu.find((b) => b.id === "cuda") || nonCpu[0]).id;
+  return "cuda";
+}
+
+async function selectGpuDevice() {
+  await selectBackend(preferGpuBackend());
+  updateComputeToggle();
+}
+
+async function selectCpuDevice() {
+  await selectBackend("cpu");
+  updateComputeToggle();
 }
 
 /* ------------------------------------------------------------ guide */
@@ -809,6 +1198,7 @@ async function loadBackends() {
     S.backendCurrent = res.current;
     renderBackends("#set-backends", S.backends, res.current);
     renderBackends("#setup-backends", S.backends, res.current);
+    updateComputeToggle();
   } catch { /* ignore */ }
 }
 
@@ -847,6 +1237,7 @@ async function selectBackend(id) {
     S.backendCurrent = id;
     await loadBackends();
     pollSystem();
+    updateComputeToggle();
     if (!res.installed) toast("That backend is not installed yet — click Install", "error", 6000);
   } catch (e) { toast("Switch failed: " + e.message, "error"); }
 }
@@ -1026,9 +1417,13 @@ async function boot() {
     const cfg = await api("/api/settings");
     S.assistant = cfg.assistant || {};
   } catch { /* ignore */ }
+  await loadProfiles();
+  setSettingsCollapsed(S.profileActive === "auto");
+  syncAssistantSide();
   updateChatHints();
   await refreshSetup();
   await Promise.all([refreshGallery(), loadSamplers(), pollSystem(), loadChats(), loadBackends()]);
+  updateComputeToggle();
   await loadChat();
   switchView(S.view);
   renderEngine();
@@ -1037,13 +1432,20 @@ async function boot() {
 }
 
 function applyDefaults(d) {
-  if (d.size) {
-    const [w, h] = String(d.size).split("x").map(Number);
-    if (w && h) setSize(w, h);
-  }
-  if (d.steps) { $("#steps").value = d.steps; $("#steps-val").textContent = d.steps; }
-  if (d.cfg) { $("#cfg").value = d.cfg; $("#cfg-val").textContent = Number(d.cfg).toFixed(1); }
-  if (d.batch) $("#batch").value = d.batch;
+  withSuppressedEdits(() => {
+    if (d.size) {
+      const [w, h] = String(d.size).split("x").map(Number);
+      if (w && h) setSize(w, h);
+    }
+    if (d.steps) { $("#steps").value = d.steps; $("#steps-val").textContent = d.steps; }
+    if (d.cfg) { $("#cfg").value = d.cfg; $("#cfg-val").textContent = Number(d.cfg).toFixed(1); }
+    if (d.sampler) $("#sampler").value = d.sampler;
+    if (d.batch) $("#batch").value = d.batch;
+    if (d.transparent !== undefined) $("#btn-transparent").classList.toggle("active", !!d.transparent);
+    updateSizeHint();
+    updateChatHints();
+  });
+  updateSettingsSummary();
 }
 
 async function loadSamplers() {
@@ -1052,7 +1454,8 @@ async function loadSamplers() {
     S.samplers = res.samplers;
     const sel = $("#sampler");
     sel.innerHTML = S.samplers.map((s) => `<option value="${s}">${s}</option>`).join("");
-    if (S.samplers.includes("euler")) sel.value = "euler";
+    const wanted = (S.settings?.defaults || {}).sampler;
+    sel.value = S.samplers.includes(wanted) ? wanted : "euler";
   } catch { /* keep default */ }
 }
 
@@ -1081,7 +1484,7 @@ function wire() {
     wrap.classList.toggle("hidden");
     $("#btn-neg").classList.toggle("active", !wrap.classList.contains("hidden"));
   };
-  $("#btn-transparent").onclick = () => $("#btn-transparent").classList.toggle("active");
+  $("#btn-transparent").onclick = () => { $("#btn-transparent").classList.toggle("active"); markManualEdit(); };
 
   $("#btn-stop").onclick = stopActive;
   $("#btn-edit-stop").onclick = stopActive;
@@ -1098,15 +1501,33 @@ function wire() {
   };
   $("#btn-chat-clear").onclick = newChat;
   $("#btn-new-chat").onclick = newChat;
+  $("#btn-chat-delete").onclick = () => { if (S.chatId) askDeleteChat(S.chatId); };
   $("#hint-go-chat").onclick = (e) => { e.preventDefault(); switchView("chat"); $("#chat-input").focus(); };
 
   // generate-view actions
   $("#btn-gen-saveas").onclick = (e) => { if (S.shown) saveAs(S.shown.id, e.target); };
   $("#btn-gen-edit").onclick = () => { if (S.shown) { addRefFromImage(S.shown); switchView("edit"); } };
   $("#btn-gen-reuse").onclick = () => { if (S.shown?.params) { applySettings(S.shown.params); toast("Settings applied", "ok"); } };
-  $("#sampler").addEventListener("change", updateChatHints);
-  $("#cfg").addEventListener("input", updateChatHints);
-  $("#batch").addEventListener("change", updateChatHints);
+  $("#sampler").addEventListener("change", () => { updateChatHints(); markManualEdit(); });
+  $("#batch").addEventListener("change", () => { updateChatHints(); markManualEdit(); });
+
+  // settings profiles
+  $("#profile-select").onchange = () => selectProfile($("#profile-select").value);
+  $("#profile-save").onclick = () => {
+    $("#profile-name-row").classList.remove("hidden");
+    $("#profile-name").focus();
+  };
+  $("#profile-name-ok").onclick = saveProfile;
+  $("#profile-name-cancel").onclick = () => {
+    $("#profile-name-row").classList.add("hidden");
+    $("#profile-name").value = "";
+  };
+  $("#profile-name").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); saveProfile(); }
+  });
+  $("#profile-update").onclick = updateProfile;
+  $("#profile-delete").onclick = deleteProfile;
+  $("#settings-fields-toggle").onclick = () => setSettingsCollapsed(!S.settingsCollapsed);
 
   // params
   $("#size-preset").onchange = () => {
@@ -1118,13 +1539,15 @@ function wire() {
       $("#custom-size").classList.add("hidden");
     }
     updateSizeHint();
+    markManualEdit();
   };
-  ["#width", "#height", "#steps", "#seed"].forEach((sel) => $(sel).addEventListener("input", updateSizeHint));
-  $("#steps").addEventListener("input", () => { $("#steps-val").textContent = $("#steps").value; updateSizeHint(); });
-  $("#cfg").addEventListener("input", () => { $("#cfg-val").textContent = Number($("#cfg").value).toFixed(1); });
-  $("#btn-fast").onclick = () => { $("#steps").value = 20; $("#steps-val").textContent = 20; updateSizeHint(); };
-  $("#btn-quality").onclick = () => { $("#steps").value = 40; $("#steps-val").textContent = 40; updateSizeHint(); };
-  $("#btn-dice").onclick = () => { $("#seed").value = Math.floor(Math.random() * 2 ** 31); };
+  ["#width", "#height"].forEach((sel) => $(sel).addEventListener("input", () => { updateSizeHint(); markManualEdit(); }));
+  $("#steps").addEventListener("input", () => { $("#steps-val").textContent = $("#steps").value; updateSizeHint(); markManualEdit(); });
+  $("#seed").addEventListener("input", () => { updateSizeHint(); markManualEdit(); });
+  $("#cfg").addEventListener("input", () => { $("#cfg-val").textContent = Number($("#cfg").value).toFixed(1); updateChatHints(); updateSettingsSummary(); markManualEdit(); });
+  $("#btn-fast").onclick = () => { $("#steps").value = 20; $("#steps-val").textContent = 20; updateSizeHint(); markManualEdit(); };
+  $("#btn-quality").onclick = () => { $("#steps").value = 40; $("#steps-val").textContent = 40; updateSizeHint(); markManualEdit(); };
+  $("#btn-dice").onclick = () => { $("#seed").value = Math.floor(Math.random() * 2 ** 31); markManualEdit(); };
 
   // edit
   $("#file-input").addEventListener("change", (e) => {
@@ -1181,6 +1604,8 @@ function wire() {
   $("#btn-logs").onclick = openLogs;
   $$("[data-close]").forEach((b) => b.onclick = () => $("#" + b.dataset.close).classList.add("hidden"));
   $$(".modal").forEach((m) => m.addEventListener("click", (e) => { if (e.target === m) m.classList.add("hidden"); }));
+  $("#btn-delete-chat-confirm").onclick = confirmDeleteChat;
+  $("#btn-delete-chat-cancel").addEventListener("click", () => { S.pendingDeleteChat = null; });
 
   $("#set-autostart").onchange = async () => {
     try { await api("/api/settings", { method: "PUT", json: { engine_autostart: $("#set-autostart").checked } }); }
@@ -1192,6 +1617,15 @@ function wire() {
   // prompt assistant (DeepSeek)
   $("#set-asst-save").onclick = saveAssistantSettings;
   $("#set-asst-test").onclick = testAssistant;
+
+  // prompt assistant + compute in the right-hand panel
+  $("#side-asst-enabled").onchange = () => setAssistantEnabledSide($("#side-asst-enabled").checked);
+  $("#side-asst-save").onclick = saveAssistantKeySide;
+  $("#side-asst-key").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); saveAssistantKeySide(); }
+  });
+  $("#side-device-gpu").onclick = selectGpuDevice;
+  $("#side-device-cpu").onclick = selectCpuDevice;
   $("#set-quit").onclick = async () => {
     if (!confirm("Quit Qwen Image Runner? The engine will stop.")) return;
     try { await api("/api/app/quit", { method: "POST" }); } catch { /* expected */ }
@@ -1209,7 +1643,7 @@ async function openSettings() {
     $("#set-asst-enabled").checked = !!S.assistant.enabled;
     $("#set-asst-key").value = "";
     $("#set-asst-key").placeholder = S.assistant.api_key_set
-      ? `saved (${S.assistant.api_key_hint}) - type to replace`
+      ? `•••••••• saved (${S.assistant.api_key_hint}) - type to replace`
       : "sk-...";
     $("#set-asst-keyhint").textContent = S.assistant.api_key_set
       ? "A key is stored locally in settings.json (gitignored - never sent anywhere except your provider)."
@@ -1217,6 +1651,7 @@ async function openSettings() {
     $("#set-asst-model").value = S.assistant.model || "deepseek-chat";
     $("#set-asst-base").value = S.assistant.base_url || "https://api.deepseek.com";
     $("#set-asst-status").textContent = "";
+    syncAssistantSide();
   } catch { /* ignore */ }
   const p = meta.paths || {};
   $("#set-paths").textContent =

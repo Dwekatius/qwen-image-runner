@@ -336,6 +336,17 @@ def delete_chat(chat_id: str) -> int:
         return cur.rowcount
 
 
+def chat_image_ids(chat_id: str) -> list[str]:
+    """Distinct image ids linked to a chat (no guaranteed order)."""
+    conn = connect()
+    rows = conn.execute(
+        "SELECT DISTINCT image_id FROM chat_messages "
+        "WHERE chat_id=? AND image_id IS NOT NULL",
+        (chat_id,),
+    ).fetchall()
+    return [row["image_id"] for row in rows]
+
+
 def add_chat_message(chat_id: str, role: str, text: str | None = None,
                      image_id: str | None = None, job_id: str | None = None,
                      meta: dict | None = None) -> str:
@@ -356,13 +367,14 @@ def add_chat_message(chat_id: str, role: str, text: str | None = None,
 def list_chat(chat_id: str, limit: int = 500) -> list[dict]:
     conn = connect()
     rows = conn.execute(
-        "SELECT * FROM (SELECT * FROM chat_messages WHERE chat_id=? ORDER BY created DESC LIMIT ?) "
-        "ORDER BY created ASC",
+        "SELECT * FROM (SELECT *, rowid AS _rid FROM chat_messages WHERE chat_id=? "
+        "ORDER BY created DESC, rowid DESC LIMIT ?) ORDER BY created ASC, _rid ASC",
         (chat_id, limit),
     ).fetchall()
     messages = []
     for row in rows:
         message = dict(row)
+        message.pop("_rid", None)  # rowid only orders the window, never exposed
         if message.get("meta"):
             try:
                 message["meta"] = json.loads(message["meta"])

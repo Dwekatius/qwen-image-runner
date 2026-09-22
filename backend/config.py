@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 APP_NAME = "Qwen Image Runner"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 SPDX_LICENSE = "PolyForm-Noncommercial-1.0.0"
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -98,6 +98,10 @@ DEFAULT_SETTINGS: dict = {
         "model": "deepseek-chat",
         "api_key": "",
     },
+    "profiles": {
+        "active": "auto",
+        "items": [],
+    },
     "license_accepted": False,
 }
 
@@ -126,6 +130,10 @@ def load_settings() -> dict:
     if extra in _LEGACY_EXTRA_ARGS:
         merged["engine"]["extra_args"] = []
     merged["schema_version"] = DEFAULT_SETTINGS["schema_version"]
+    # Auto mode means the assistant manages settings from the app baseline; any values
+    # left over from manual editing must not silently become the Auto fallback.
+    if (merged.get("profiles") or {}).get("active", "auto") == "auto":
+        merged["defaults"] = json.loads(json.dumps(DEFAULT_SETTINGS["defaults"]))
     return merged
 
 

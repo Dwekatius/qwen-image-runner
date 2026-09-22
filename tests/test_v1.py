@@ -1,4 +1,4 @@
-"""v1.0 acceptance tests — API, queue semantics, gallery, downloader (MockEngine, no GPU)."""
+"""App acceptance tests — API/CSRF, queue semantics, chat, gallery, downloader, assistant (MockEngine, no GPU)."""
 from __future__ import annotations
 
 import hashlib
@@ -85,6 +85,9 @@ def test_transparent_prompt_wrapping(client):
 
 
 def test_settings_roundtrip(client):
+    # Auto owns settings["defaults"] and ignores them on PUT; the client flips to manual
+    # before its debounced save, so use that path here.
+    client.post("/api/profiles/active", json={"id": "manual"})
     r = client.put("/api/settings", json={"defaults": {"steps": 20, "cfg": 5.5}, "engine_autostart": False})
     assert r.status_code == 200
     meta = client.get("/api/meta").json()
@@ -192,6 +195,85 @@ def test_save_as_export(client, tmp_path):
     assert res["saved"] is True
     assert Path(res["path"]).exists()
     assert Path(res["path"]).read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_delete_chat_removes_its_images_but_keeps_saved(client):
+    from backend import config, storage
+
+    chat = client.post("/api/chats", json={}).json()["chat"]
+    res = client.post("/api/chat/submit", json={
+        "text": "a delete-test apple",
+        "chat_id": chat["id"],
+        "params": {"width": 512, "height": 512, "steps": 4, "seed": 21},
+    }).json()
+    assert wait_job(client, res["job"])["status"] == "completed"
+    image = client.get(f"/api/chat?chat_id={chat['id']}").json()["messages"][1]["image"]
+    image_id = image["id"]
+    chat_file = storage.resolve_path(image["path"])
+    chat_dir = (config.OUTPUTS_DIR / "chats" / chat["id"]).resolve()
+    assert chat_file.exists()
+    assert chat_file.resolve().is_relative_to(chat_dir)
+    thumb_file = storage.resolve_path(image["thumb"])
+    assert thumb_file.exists()
+
+    # a copy the user saved outside the chat folder must survive the cleanup
+    saved = client.post(f"/api/images/{image_id}/save_as").json()
+    assert saved["saved"] is True and saved["test_mode"] is True
+    saved_copy = Path(saved["path"])
+    assert saved_copy.exists()
+
+    # a second chat's image must be untouched
+    other = client.post("/api/chats", json={}).json()["chat"]
+    res2 = client.post("/api/chat/submit", json={
+        "text": "generate a keep-test apple",
+        "chat_id": other["id"],
+        "params": {"width": 512, "height": 512, "steps": 4, "seed": 22},
+    }).json()
+    assert wait_job(client, res2["job"])["status"] == "completed"
+    other_image = client.get(f"/api/chat?chat_id={other['id']}").json()["messages"][1]["image"]
+    other_file = storage.resolve_path(other_image["path"])
+    assert other_file.exists()
+
+    deleted = client.delete(f"/api/chats/{chat['id']}").json()
+    assert deleted == {"ok": True, "deleted": 1, "images_deleted": 1, "images_kept": 0}
+
+    gallery_ids = [img["id"] for img in client.get("/api/gallery").json()["images"]]
+    assert image_id not in gallery_ids
+    assert other_image["id"] in gallery_ids
+    assert not chat_file.exists()
+    assert not thumb_file.exists()
+    assert saved_copy.exists()
+    assert other_file.exists()
+    chat_ids = [c["id"] for c in client.get("/api/chats").json()["chats"]]
+    assert chat["id"] not in chat_ids
+    assert other["id"] in chat_ids
+    assert client.delete("/api/chats/does-not-exist").status_code == 404
+
+
+def test_delete_chat_keep_images_flag(client):
+    from backend import storage
+
+    chat = client.post("/api/chats", json={}).json()["chat"]
+    res = client.post("/api/chat/submit", json={
+        "text": "a keep-test apple",
+        "chat_id": chat["id"],
+        "params": {"width": 512, "height": 512, "steps": 4, "seed": 23},
+    }).json()
+    assert wait_job(client, res["job"])["status"] == "completed"
+    image = client.get(f"/api/chat?chat_id={chat['id']}").json()["messages"][1]["image"]
+    image_file = storage.resolve_path(image["path"])
+    assert image_file.exists()
+
+    deleted = client.delete(f"/api/chats/{chat['id']}?delete_images=false").json()
+    assert deleted["deleted"] == 1
+    assert deleted["images_deleted"] == 0
+    assert deleted["images_kept"] == 1
+
+    assert image_file.exists()
+    gallery_ids = [img["id"] for img in client.get("/api/gallery").json()["images"]]
+    assert image["id"] in gallery_ids
+    chat_ids = [c["id"] for c in client.get("/api/chats").json()["chats"]]
+    assert chat["id"] not in chat_ids
 
 
 def test_downloader_resume_and_hash(tmp_path, monkeypatch, app_module):
@@ -321,6 +403,7 @@ def test_assistant_writes_the_prompt_and_can_chat(client):
         _DeepSeekHandler.reply = {"action": "chat", "prompt": "", "reply": "Warm light suits apples best."}
         res2 = client.post("/api/chat/submit", json={"text": "any tips?", "chat_id": chat["id"]}).json()
         assert res2["mode"] == "chat"
+        assert "job" not in res2  # a chat answer must not start an image job
         messages = client.get(f"/api/chat?chat_id={chat['id']}").json()["messages"]
         assert messages[-1]["role"] == "assistant"
         assert "Warm light" in messages[-1]["text"]

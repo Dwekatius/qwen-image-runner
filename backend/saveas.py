@@ -83,7 +83,7 @@ def suggested_name(prompt: str | None, seed, ext: str = ".png") -> str:
     import re
 
     base = re.sub(r"[^A-Za-z0-9 _-]+", "", prompt or "").strip()
-    base = re.sub(r"\s+", "-", base)[:48].strip("-") or "local-canvas"
+    base = re.sub(r"\s+", "-", base)[:48].strip("-") or "qwen-image-runner"
     suffix = f"-{seed}" if seed is not None else ""
     return f"{base}{suffix}{ext}"
 

@@ -8,5 +8,7 @@ $sc = $ws.CreateShortcut($link)
 $sc.TargetPath = $target
 $sc.WorkingDirectory = $root
 $sc.Description = "Qwen Image Runner - local image studio for Qwen-Image-2.1"
+$icon = Join-Path $root "Logo.ico"
+if (Test-Path $icon) { $sc.IconLocation = "$icon,0" }
 $sc.Save()
 Write-Output "shortcut created: $link"

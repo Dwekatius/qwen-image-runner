@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses semantic versioning.
 
+## [Unreleased]
+
+### Fixed
+
+- Desktop shortcut now carries the app logo: `Install.bat` points the shortcut's icon at the new
+  multi-size `Logo.ico`, and the app serves a `favicon.ico` fallback next to the SVG favicon.
+- Suggested image filenames fall back to `qwen-image-runner` instead of the old `local-canvas` name.
+
 ## [1.2.0] — 2026-09-22
 
 ### Added

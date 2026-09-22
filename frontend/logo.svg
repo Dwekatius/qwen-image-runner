@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Qwen Image Runner">
+  <defs>
+    <linearGradient id="qir" x1="96" y1="72" x2="430" y2="452" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6d5efc"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="qirSoft" x1="120" y1="140" x2="400" y2="340" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6d5efc" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#3b82f6" stop-opacity="0.35"/>
+    </linearGradient>
+  </defs>
+
+  <!-- app window -->
+  <rect x="56" y="56" width="368" height="300" rx="46" fill="url(#qir)"/>
+  <rect x="84" y="112" width="312" height="216" rx="26" fill="#ffffff"/>
+
+  <!-- window controls -->
+  <circle cx="104" cy="84" r="10" fill="#ffffff" opacity="0.95"/>
+  <circle cx="136" cy="84" r="10" fill="#ffffff" opacity="0.95"/>
+  <circle cx="168" cy="84" r="10" fill="#ffffff" opacity="0.95"/>
+
+  <!-- picture inside the window -->
+  <circle cx="344" cy="166" r="20" fill="url(#qirSoft)"/>
+  <path d="M112 306 L206 196 L272 268 L312 226 L368 306 Z" fill="url(#qirSoft)"/>
+
+  <!-- output / run badge -->
+  <circle cx="392" cy="392" r="86" fill="url(#qir)"/>
+  <path d="M368 352 L440 392 L368 432 Z" fill="#ffffff"/>
+  <rect x="292" y="376" width="72" height="15" rx="7.5" fill="url(#qir)"/>
+  <rect x="292" y="399" width="54" height="15" rx="7.5" fill="url(#qir)" opacity="0.7"/>
+</svg>

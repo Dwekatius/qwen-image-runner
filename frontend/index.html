@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qwen Image Runner</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="icon" type="image/png" href="/logo.png">
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">
+    <img class="brand-logo" src="/logo.png" alt="">
+    <span class="brand-name">Qwen Image Runner</span>
+    <span class="brand-ver" id="brand-ver">v1.0.0</span>
+  </div>
+  <div class="status-chips">
+    <span id="engine-chip" class="chip" title="Engine state"><span class="dot" id="engine-dot"></span><span id="engine-label">Engine: starting…</span></span>
+    <span id="vram-chip" class="chip muted" title="GPU memory">VRAM —</span>
+    <span id="queue-chip" class="chip muted hidden">Queue 0</span>
+  </div>
+  <div class="top-actions">
+    <button id="btn-logs" class="icon-btn" title="Engine logs">Logs</button>
+    <button id="btn-settings" class="icon-btn" title="Settings">Settings</button>
+  </div>
+</header>
+
+<div id="layout">
+  <aside id="sidebar">
+    <nav id="nav">
+      <button class="nav-btn active" data-view="chat">Chat</button>
+      <button class="nav-btn" data-view="generate">Generate</button>
+      <button class="nav-btn" data-view="edit">Edit</button>
+      <button class="nav-btn" data-view="gallery">Gallery</button>
+      <button class="nav-btn" data-view="guide">Guide</button>
+    </nav>
+    <button id="btn-new-chat" class="ghost new-chat-btn">＋ New chat</button>
+    <div id="chats-section">
+      <div class="side-head"><span>Chats</span></div>
+      <div id="chats-list" class="history"></div>
+    </div>
+    <div id="history-section">
+      <div class="side-head">
+        <span>History</span>
+        <button id="btn-refresh-history" class="ghost tiny" title="Refresh">↻</button>
+      </div>
+      <div id="history" class="history"><div class="empty small">No images yet</div></div>
+    </div>
+  </aside>
+
+  <main id="center">
+
+    <!-- ========================= CHAT ========================= -->
+    <section id="view-chat" class="view">
+      <div class="chat-head">
+        <h2>Chat</h2>
+        <div class="chat-head-actions">
+          <button id="btn-chat-clear" class="ghost small">＋ New chat</button>
+        </div>
+      </div>
+      <div id="chat-scroll" class="chat-scroll">
+        <div id="chat-empty" class="empty">
+          Describe an image to start — then refine it in plain language.<br>
+          <span class="muted small">“a golden retriever on a beach at sunset” &nbsp;→&nbsp; “make it wear sunglasses”</span>
+        </div>
+        <div id="chat-messages" class="chat-messages"></div>
+      </div>
+      <div class="composer">
+        <div id="chat-context" class="chat-context hidden">
+          <img id="chat-ref-thumb" alt="">
+          <span class="small" id="chat-context-label">Editing the image above</span>
+          <span class="spacer"></span>
+          <button id="btn-chat-mode" class="ghost small">New image</button>
+        </div>
+        <textarea id="chat-input" rows="2" placeholder="Describe an image or a change… (Enter to send)"></textarea>
+        <div class="composer-row">
+          <span class="muted small" id="chat-params-hint"></span>
+          <span class="spacer"></span>
+          <button id="btn-chat-send" class="primary">Send</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= GENERATE ======================= -->
+    <section id="view-generate" class="view hidden">
+      <div class="stage" id="gen-stage">
+        <div id="gen-placeholder" class="stage-placeholder">
+          <div class="ph-icon"></div>
+          <div>Your image will appear here</div>
+          <div class="muted small">Type a prompt below and press Generate</div>
+        </div>
+        <img id="gen-image" class="stage-image hidden" alt="">
+        <div id="stage-badge" class="stage-badge hidden"></div>
+      </div>
+
+      <div id="gen-actions" class="gen-actions hidden">
+        <button id="btn-gen-saveas" class="ghost small">Save as…</button>
+        <button id="btn-gen-edit" class="ghost small">Edit this image</button>
+        <button id="btn-gen-reuse" class="ghost small">Reuse settings</button>
+      </div>
+
+      <div id="progress-wrap" class="progress-wrap hidden">
+        <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+        <div class="progress-info">
+          <span id="progress-label">Queued…</span>
+          <span id="progress-rate" class="muted"></span>
+          <span id="progress-elapsed" class="muted"></span>
+          <span class="spacer"></span>
+          <button id="btn-stop" class="danger small">Stop generation — reloads model</button>
+        </div>
+      </div>
+
+      <div id="gen-meta" class="meta hidden"></div>
+
+      <div class="composer">
+        <textarea id="prompt" rows="3" placeholder="Describe the image… (Ctrl+Enter to generate)"></textarea>
+        <div id="negative-wrap" class="hidden">
+          <textarea id="negative" rows="2" placeholder="Negative prompt (things to avoid)"></textarea>
+        </div>
+        <div class="composer-row">
+          <button id="btn-neg" class="ghost small">+ Negative prompt</button>
+          <button id="btn-transparent" class="ghost small">Transparent</button>
+          <span class="spacer"></span>
+          <span id="composer-hint" class="muted small">New image every time — <a href="#" id="hint-go-chat" class="inline-link">use Chat to edit with context</a></span>
+          <button id="btn-generate" class="primary">Generate</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================= EDIT ========================= -->
+    <section id="view-edit" class="view hidden">
+      <div class="stage" id="edit-stage">
+        <div class="edit-compare" id="edit-compare">
+          <img id="edit-before" class="compare-img" alt="before">
+          <div class="compare-after-wrap" id="compare-wrap">
+            <img id="edit-after" class="compare-img" alt="after">
+          </div>
+          <div id="edit-compare-placeholder" class="stage-placeholder">
+            <div class="ph-icon"></div>
+            <div>Add reference images and describe an edit</div>
+            <div class="muted small">Use an image from the gallery → “Use as input”, or upload one</div>
+          </div>
+        </div>
+        <input id="compare-slider" class="compare-slider hidden" type="range" min="0" max="100" value="50">
+        <div id="edit-badge" class="stage-badge hidden"></div>
+      </div>
+
+      <div class="refs-bar">
+        <div id="refs-strip" class="refs-strip"></div>
+        <label class="upload-btn">
+          + Add images
+          <input id="file-input" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+        </label>
+      </div>
+
+      <div id="edit-progress" class="progress-wrap hidden">
+        <div class="progress-bar"><div id="edit-progress-fill" class="progress-fill"></div></div>
+        <div class="progress-info">
+          <span id="edit-progress-label">Queued…</span>
+          <span id="edit-progress-elapsed" class="muted"></span>
+          <span class="spacer"></span>
+          <button id="btn-edit-stop" class="danger small">Stop generation — reloads model</button>
+        </div>
+      </div>
+
+      <div class="composer">
+        <textarea id="instruction" rows="2" placeholder="Describe the edit… e.g. “Turn the apple green, keep the background”"></textarea>
+        <div class="composer-row">
+          <label class="inline-check"><input type="checkbox" id="edit-transparent"> Transparent background</label>
+          <span class="spacer"></span>
+          <button id="btn-edit" class="primary">Edit image</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= GALLERY ======================== -->
+    <section id="view-gallery" class="view hidden">
+      <div class="gallery-head">
+        <h2>Gallery</h2>
+        <div class="gallery-filters">
+          <select id="filter-kind">
+            <option value="">All</option>
+            <option value="generate">Generated</option>
+            <option value="edit">Edited</option>
+          </select>
+          <button id="btn-refresh-gallery" class="ghost small">Refresh</button>
+        </div>
+      </div>
+      <div id="gallery-grid" class="grid"></div>
+      <div id="gallery-empty" class="empty">Nothing here yet — generate your first image.</div>
+    </section>
+
+    <!-- ======================== GUIDE ========================= -->
+    <section id="view-guide" class="view hidden">
+      <div class="guide-head">
+        <h2>Guide</h2>
+        <span class="muted small" id="guide-sub"></span>
+      </div>
+      <div class="guide-scroll">
+        <article id="guide-content" class="guide"><div class="empty">Loading guide…</div></article>
+      </div>
+    </section>
+  </main>
+
+  <aside id="params">
+    <section class="panel-section">
+      <h3>Image</h3>
+      <label class="field">Size
+        <select id="size-preset">
+          <option value="512x512">CPU draft · 512 × 512</option>
+          <option value="1024x1024">Draft · 1024 × 1024</option>
+          <option value="1536x864">Draft · 16:9 · 1536 × 864</option>
+          <option value="864x1536">Draft · 9:16 · 864 × 1536</option>
+          <option value="1536x1536">Standard · 1536 × 1536</option>
+          <option value="2048x2048">Native · 1:1 · 2048 × 2048</option>
+          <option value="2400x1792">Native · 4:3 · 2400 × 1792</option>
+          <option value="1792x2400">Native · 3:4 · 1792 × 2400</option>
+          <option value="2528x1696">Native · 3:2 · 2528 × 1696</option>
+          <option value="1696x2528">Native · 2:3 · 1696 × 2528</option>
+          <option value="2752x1536">Native · 16:9 · 2752 × 1536</option>
+          <option value="1536x2752">Native · 9:16 · 1536 × 2752</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </label>
+      <div class="row2 hidden" id="custom-size">
+        <label class="field">Width <input id="width" type="number" step="32" min="256" max="4096" value="1024"></label>
+        <label class="field">Height <input id="height" type="number" step="32" min="256" max="4096" value="1024"></label>
+      </div>
+      <div class="hint small muted" id="size-hint">~1.7 min on RTX 5070 Ti @ 40 steps</div>
+    </section>
+
+    <section class="panel-section">
+      <h3>Sampling</h3>
+      <label class="field">Steps <span id="steps-val" class="val">40</span>
+        <input id="steps" type="range" min="10" max="60" value="40">
+      </label>
+      <div class="row2">
+        <button id="btn-fast" class="ghost small">Fast (20)</button>
+        <button id="btn-quality" class="ghost small">Native (40)</button>
+      </div>
+      <label class="field">CFG <span id="cfg-val" class="val">6.0</span>
+        <input id="cfg" type="range" min="1" max="10" step="0.5" value="6">
+      </label>
+      <label class="field">Sampler
+        <select id="sampler"><option value="euler">euler</option></select>
+      </label>
+      <label class="field">Seed
+        <div class="seed-row">
+          <input id="seed" type="number" value="-1" title="-1 = random">
+          <button id="btn-dice" class="ghost small" title="Random seed">🎲</button>
+        </div>
+      </label>
+    </section>
+
+    <section class="panel-section">
+      <h3>Batch</h3>
+      <label class="field">Images per prompt
+        <select id="batch">
+          <option value="1">1</option><option value="2">2</option>
+          <option value="3">3</option><option value="4">4</option>
+        </select>
+      </label>
+      <div class="hint small muted">Rendered sequentially with consecutive seeds.</div>
+    </section>
+
+    <section class="panel-section">
+      <h3>Engine</h3>
+      <div id="engine-info" class="engine-info small muted">—</div>
+      <div class="row2">
+        <button id="btn-engine-restart" class="ghost small">Reload</button>
+        <button id="btn-engine-stop" class="ghost small">Stop</button>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<!-- ======================= SETUP OVERLAY ======================= -->
+<div id="setup-overlay" class="overlay hidden">
+  <div class="setup-card">
+    <h1>Welcome to Qwen Image Runner</h1>
+    <p class="muted">A local image studio for <b>Qwen-Image-2.1</b> (unofficial). Everything runs on this PC.</p>
+
+    <div class="license-box">
+      <h3>Licenses</h3>
+      <ul class="small">
+        <li><b>App:</b> PolyForm Noncommercial 1.0.0 — free for personal, educational, research, and nonprofit use; commercial use prohibited.</li>
+        <li><b>Model weights:</b> Qwen Research License — research/evaluation use; commercial use requires separate permission from Alibaba. Weights are downloaded from Hugging Face, never bundled.</li>
+        <li class="muted">Unofficial project — not affiliated with, endorsed by, or connected to Alibaba/Qwen.</li>
+      </ul>
+      <label class="inline-check"><input type="checkbox" id="license-check"> I understand and accept these terms</label>
+    </div>
+
+    <div class="setup-section">
+      <h3>Compute backend</h3>
+      <p class="muted small">Pick what runs the model. You can change or add more later in Settings.</p>
+      <div id="setup-backends" class="backend-list"></div>
+      <div id="setup-backend-progress" class="progress-wrap hidden">
+        <div class="progress-bar"><div id="setup-backend-fill" class="progress-fill"></div></div>
+        <div class="progress-info"><span id="setup-backend-label" class="muted">Starting...</span></div>
+      </div>
+    </div>
+
+    <div class="setup-section">
+      <h3>Model files</h3>
+      <div id="setup-models" class="setup-models"></div>
+      <div id="setup-download-wrap" class="progress-wrap hidden">
+        <div class="progress-bar"><div id="setup-download-fill" class="progress-fill"></div></div>
+        <div class="progress-info"><span id="setup-download-label" class="muted">Starting…</span>
+          <span class="spacer"></span><button id="btn-cancel-download" class="ghost small">Cancel</button></div>
+      </div>
+      <button id="btn-download" class="primary" disabled>Download missing files</button>
+    </div>
+
+    <div class="setup-section">
+      <h3>Engine</h3>
+      <div id="setup-engine" class="muted small">—</div>
+      <div class="row2">
+        <button id="btn-setup-start" class="primary">Start engine</button>
+        <button id="btn-enter-app" class="ghost" disabled>Open studio</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= SETTINGS MODAL ======================= -->
+<div id="settings-modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head"><h2>Settings</h2><button class="icon-btn" data-close="settings-modal">✕</button></div>
+    <div class="modal-body">
+      <h3>Engine</h3>
+      <label class="inline-check"><input type="checkbox" id="set-autostart"> Start engine automatically when the app opens</label>
+      <h3>Engine backend</h3>
+      <div id="set-backends" class="backend-list"></div>
+      <div class="hint small muted">Switching backends restarts the engine. Sizes shown are the download for that build.</div>
+      <div class="mono-box small" id="set-paths"></div>
+      <div class="row2">
+        <button id="set-restart" class="ghost">Reload engine</button>
+        <button id="set-stop" class="ghost">Stop engine</button>
+      </div>
+      <h3>Storage</h3>
+      <div class="mono-box small" id="set-storage"></div>
+      <h3>About</h3>
+      <div class="small muted" id="set-about"></div>
+      <h3 class="danger-text">Danger zone</h3>
+      <button id="set-quit" class="danger">Quit Qwen Image Runner</button>
+      <div class="hint small muted">Stops the engine and closes the local server. Your images stay on disk.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= LOGS MODAL ======================= -->
+<div id="logs-modal" class="modal hidden">
+  <div class="modal-card wide">
+    <div class="modal-head"><h2>Engine logs</h2><button class="icon-btn" data-close="logs-modal">✕</button></div>
+    <div class="modal-body">
+      <pre id="logs-pre" class="logs"></pre>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>

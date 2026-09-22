@@ -1,0 +1,27 @@
+# Local runtime data — never publish
+engine/
+models/
+inputs/
+outputs/
+thumbnails/
+data/
+logs/
+settings.json
+test-artifacts/
+*.log
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# OS / editors
+nul
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/

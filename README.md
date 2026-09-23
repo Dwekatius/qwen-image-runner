@@ -172,6 +172,8 @@ can download, run and fork it under the license terms.
 
 ## License
 
+Qwen Image Runner — Copyright © 2026 Mohanad Dwekat (Dwekatius).
+
 - **App code:** [GNU GPL v3](LICENSE) — free to use, modify, fork and share. Any version you
   distribute must stay GPL-3.0 with its source available, so nobody can turn it into a closed,
   paid product. (The license does not forbid selling copies, but the source must come with them —

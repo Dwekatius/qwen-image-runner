@@ -15,7 +15,7 @@
   <div class="brand">
     <img class="brand-logo" src="/logo.png" alt="">
     <span class="brand-name">Qwen Image Runner</span>
-    <span class="brand-ver" id="brand-ver">v1.2.1</span>
+    <span class="brand-ver" id="brand-ver">v1.3.0</span>
   </div>
   <div class="status-chips">
     <span id="engine-chip" class="chip" title="Engine state"><span class="dot" id="engine-dot"></span><span id="engine-label">Engine: starting…</span></span>
@@ -341,7 +341,7 @@
       <h3>Licenses</h3>
       <ul class="small">
         <li><b>App:</b> GNU GPL v3 — free to use, modify and share; any version you distribute must stay open source under the same license.</li>
-        <li><b>Model weights:</b> Qwen Research License — research/evaluation use; commercial use requires separate permission from Alibaba. Weights are downloaded from Hugging Face, never bundled.</li>
+        <li><b>Model weights:</b> Qwen-Image-2.1 denoiser + VAE: Qwen Research License — research/evaluation use; commercial use needs separate permission from Alibaba. Qwen3-VL text encoder + vision projector: Apache-2.0. Weights are downloaded from Hugging Face, never bundled.</li>
         <li class="muted">Unofficial project — not affiliated with, endorsed by, or connected to Alibaba/Qwen.</li>
       </ul>
       <label class="inline-check"><input type="checkbox" id="license-check"> I understand and accept these terms</label>
@@ -390,7 +390,7 @@
       <div class="hint small muted">Only when the last window closes; reloading is safe.</div>
       <h3>Engine backend</h3>
       <div id="set-backends" class="backend-list"></div>
-      <div class="hint small muted">Switching backends restarts the engine. Sizes shown are the download for that build.</div>
+      <div class="hint small muted">Switching backends restarts the engine. Builds marked “not installed” can be downloaded here.</div>
       <div class="mono-box small" id="set-paths"></div>
       <div class="row2">
         <button id="set-restart" class="ghost">Reload engine</button>
@@ -452,7 +452,7 @@
   </div>
 </div>
 
-<div id="toasts"></div>
+<div id="toasts" aria-live="polite"></div>
 <script type="module" src="/static/app.js"></script>
 </body>
 </html>

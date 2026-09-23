@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses semantic versioning.
 
-## [Unreleased]
+## [1.3.0] — 2026-09-24
 
 ### Added
 
@@ -13,6 +13,23 @@ All notable changes to this project are documented here. Format based on
   alive until the last one closes, and a window that dies without closing is detected via heartbeat
   timeout. Exposed as *Stop the app and unload the model when its window closes* in
   *Settings → Engine* (on by default, persisted in `settings.json → app.quit_on_window_close`).
+
+### Changed
+
+- **Docs: complete A→Z guide** — `docs/GUIDE.md` is now a step-by-step path from getting the app
+  (git clone or ZIP download) through install, the first-run setup and the first image, followed by
+  full reference sections for the DeepSeek prompt assistant, every setting, the four model files,
+  workflows, troubleshooting and an FAQ; `README.md`'s quick start and `docs/INSTALL.md` were
+  aligned with it. No code changes.
+- **UI polish pass** — shared motion scale and easing across buttons, inputs, cards, nav and
+  gallery items; view/modal/toast/chat entrance animations (played once, not on re-render); a soft
+  pulse on the real progress bar; hover and keyboard `:focus-visible` states everywhere; thin
+  scrollbars; a higher-contrast faint text colour; and a `prefers-reduced-motion` override that
+  disables all of it. Layout verified at 1024 px and 1440 px with no overflow.
+- **Docs corrections** — the engine-backend hint no longer claims the list shows download sizes; the
+  licence wording now distinguishes the Qwen Research License (denoiser + VAE) from the Apache-2.0
+  Qwen3-VL text encoder/vision projector in the README, GUIDE, INSTALL, setup overlay and About box;
+  model-download totals corrected to ≈14.7 GB; RAM guidance clarified (≈13 GB peak with CPU offload).
 
 ## [1.2.1] — 2026-09-24
 

@@ -264,7 +264,7 @@ async def models() -> dict:
         "license": {
             "app": config.SPDX_LICENSE,
             "app_url": "https://www.gnu.org/licenses/gpl-3.0.html",
-            "model": "Qwen Research License (research/evaluation; separate permission for commercial use)",
+            "model": "Qwen-Image-2.1 denoiser + VAE: Qwen Research License (research/evaluation; separate permission for commercial use); Qwen3-VL text encoder + vision projector: Apache-2.0",
             "model_url": "https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE",
             "unofficial": "Unofficial project — not affiliated with, endorsed by, or connected to Alibaba/Qwen.",
         },

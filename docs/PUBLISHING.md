@@ -38,7 +38,7 @@ git commit -m "Qwen Image Runner 1.0.0"
 
 ## 4. Release
 
-1. Tag and release `v1.2.1` — copy the `[1.2.1]` entry from `CHANGELOG.md` (v1.2.0 is already
+1. Tag and release `v1.3.0` — copy the `[1.3.0]` entry from `CHANGELOG.md` (v1.2.1 is already
    published; do not reuse that tag).
 2. Release notes should repeat the model-license caveat (Qwen Research License; weights are *not*
    in the release — the app downloads them after showing the terms).

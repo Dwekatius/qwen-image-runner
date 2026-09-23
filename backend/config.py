@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 APP_NAME = "Qwen Image Runner"
-APP_VERSION = "1.2.1"
+APP_VERSION = "1.3.0"
 SPDX_LICENSE = "GPL-3.0-only"
 
 ROOT = Path(__file__).resolve().parent.parent

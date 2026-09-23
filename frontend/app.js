@@ -40,6 +40,10 @@ const S = {
 
 const WINDOW_ID = crypto.randomUUID();
 
+/* chat message ids already shown in this window; used so the entrance animation
+   only plays for newly inserted messages, not on every list re-render */
+const seenChatMessageIds = new Set();
+
 /* ------------------------------------------------------------ helpers */
 async function api(path, opts = {}, retried = false) {
   const headers = Object.assign({}, opts.headers || {});
@@ -809,8 +813,14 @@ function renderChat() {
   const delBtn = $("#btn-chat-delete");
   if (delBtn) delBtn.disabled = !S.chatId;
   for (const m of S.chat) {
-    wrap.appendChild(m.role === "user" ? chatUserEl(m) : chatAssistantEl(m));
+    const el = m.role === "user" ? chatUserEl(m) : chatAssistantEl(m);
+    if (m.id && !seenChatMessageIds.has(m.id)) {
+      seenChatMessageIds.add(m.id);
+      el.classList.add("msg-enter");
+    }
+    wrap.appendChild(el);
   }
+  if (seenChatMessageIds.size > 4000) seenChatMessageIds.clear();
   if (S.active && S.active.kind === "chat" && S.active.id) wrap.appendChild(progressSlot());
   if (wasNearBottom) scroller.scrollTop = scroller.scrollHeight;
   else scroller.scrollTop = Math.min(prevTop, Math.max(0, scroller.scrollHeight - scroller.clientHeight));
@@ -1695,7 +1705,7 @@ async function openSettings() {
       models.components.map((c) => `${c.present ? "✓" : "✗"} ${c.destination} (${fmtBytes(c.bytes)})`).join("\n");
     $("#set-about").innerHTML =
       `<b>${meta.app}</b> v${meta.version} — unofficial local studio for Qwen-Image-2.1.<br>` +
-      `App license: ${meta.license}. Model weights: Qwen Research License.<br>` +
+      `App license: ${meta.license}. Qwen-Image-2.1 weights: Qwen Research License; Qwen3-VL encoder: Apache-2.0.<br>` +
       `Not affiliated with, endorsed by, or connected to Alibaba/Qwen.`;
   } catch { /* ignore */ }
   $("#settings-modal").classList.remove("hidden");

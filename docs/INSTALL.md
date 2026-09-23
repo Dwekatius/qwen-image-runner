@@ -1,6 +1,8 @@
 # Installing Qwen Image Runner
 
 This page lists everything you need, what gets downloaded, and how to do it by hand if you prefer.
+For the full walkthrough — from the clone to your first image and every setting in the app — see
+[GUIDE.md](GUIDE.md).
 
 ## 1. What you need
 
@@ -8,7 +10,7 @@ This page lists everything you need, what gets downloaded, and how to do it by h
 |---|---|
 | **Windows 10 or 11 (64-bit)** | The launcher scripts and the engine builds are Windows-specific. |
 | **Python 3.11 or newer** | [python.org/downloads](https://www.python.org/downloads/) — tick **“Add python.exe to PATH”** during setup. Verify with `python --version`. |
-| **~25 GB free disk** | Engine ≈ 0.9 GB + models ≈ 14.6 GB + room for your images. |
+| **~25 GB free disk** | Engine ≈ 0.9 GB + models ≈ 14.7 GB + room for your images. |
 | **8 GB+ RAM** | 16 GB+ recommended. The engine keeps model weights in RAM when CUDA offload is on (≈13 GB peak). |
 | **A GPU — optional** | NVIDIA (CUDA) is fastest. AMD/Intel work through Vulkan. **No GPU at all is fine: CPU mode works, it is just slow.** |
 | **Internet** | Only for the one-time downloads. Nothing is sent anywhere afterwards. |
@@ -45,11 +47,12 @@ any time from **Settings → Engine backend → Install**.
 
 `Launch.bat` starts the local service and opens the studio in its own window. The setup screen asks for:
 
-1. **Licence acceptance** — the app (GPL-3.0) and the model weights
-   (Qwen Research License). Nothing is downloaded before you accept.
+1. **Licence acceptance** — the app (GPL-3.0), the Qwen-Image-2.1 weights (Qwen Research License) and the Qwen3-VL encoder/projector (Apache-2.0). Nothing is downloaded before you accept.
 2. **Compute backend** — pick what runs the model; download it if it is not installed yet.
-3. **Model files** — ~14.6 GB, resumable, checksum-verified.
+3. **Model files** — ~14.7 GB, resumable and checksum-verified. You can cancel the download and
+   resume it later; nothing is re-downloaded that is already complete.
 4. **Start engine** — the first start loads ~13 GB from disk and takes a while; later starts are seconds.
+5. **Open studio** — enabled once the required model files are present and the engine is ready.
 
 ## 4. Manual install (no scripts)
 

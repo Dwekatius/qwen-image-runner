@@ -79,7 +79,7 @@ DEFAULT_SETTINGS: dict = {
         "autostart": True,
         "backend": DEFAULT_BACKEND,
         "diffusion_model": "models/diffusion/qwen_image_2.1-Q8_0.gguf",
-        "text_encoder": "models/text_encoders/Qwen3VL-8B-Instruct-Q4_K_M.gguf",
+        "text_encoder": "models/text_encoders/Qwen3VL-8B-Instruct-UD-Q4_K_XL.gguf",
         "vision_projector": "models/text_encoders/mmproj-Qwen3VL-8B-Instruct-F16.gguf",
         "vae": "models/vae/qwen_image_2.1_vae_bf16.safetensors",
         "extra_args": [],

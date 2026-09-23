@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "notes": "Pinned model files with sizes and SHA-256 recorded from the Phase 0 verification run (2026-09-21).",
+  "notes": "Pinned model files with sizes and SHA-256 recorded from the Phase 0 verification run (2026-09-21). The text encoder was upgraded to the Unsloth Dynamic 2.0 quant on 2026-09-24.",
   "components": [
     {
       "id": "diffusion-q8",
@@ -13,13 +13,13 @@
       "license": "Qwen Research License"
     },
     {
-      "id": "encoder-q4km",
-      "name": "Text encoder · Qwen3-VL 8B Instruct Q4_K_M",
+      "id": "encoder-ud-q4-k-xl",
+      "name": "Text encoder · Qwen3-VL 8B Instruct UD-Q4_K_XL (Unsloth Dynamic)",
       "role": "text_encoder",
-      "path": "models/text_encoders/Qwen3VL-8B-Instruct-Q4_K_M.gguf",
-      "url": "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/Qwen3VL-8B-Instruct-Q4_K_M.gguf",
-      "bytes": 5027784800,
-      "sha256": "67d1659bfe71b89d50b45a4ad1a9e5b997e5bb16ce5da66a6a6167abd569e9e2",
+      "path": "models/text_encoders/Qwen3VL-8B-Instruct-UD-Q4_K_XL.gguf",
+      "url": "https://huggingface.co/unsloth/Qwen3-VL-8B-Instruct-GGUF/resolve/main/Qwen3-VL-8B-Instruct-UD-Q4_K_XL.gguf",
+      "bytes": 5148699488,
+      "sha256": "e3d1a6e87c5cb31e054f2c3bc0dd82ffde052f613de5eef3665b7bd33c9b703e",
       "license": "Apache-2.0 (Qwen3-VL)"
     },
     {
@@ -50,6 +50,17 @@
       "url": "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf",
       "bytes": 752289728,
       "sha256": "c6ba85508d82f42590e6eb77d5340369ab6fecf107a7561d809523d8aa5f3bfd",
+      "license": "Apache-2.0 (Qwen3-VL)",
+      "optional": true
+    },
+    {
+      "id": "encoder-q4km",
+      "name": "Text encoder · Qwen3-VL 8B Instruct Q4_K_M (previous default)",
+      "role": "text_encoder",
+      "path": "models/text_encoders/Qwen3VL-8B-Instruct-Q4_K_M.gguf",
+      "url": "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/Qwen3VL-8B-Instruct-Q4_K_M.gguf",
+      "bytes": 5027784800,
+      "sha256": "67d1659bfe71b89d50b45a4ad1a9e5b997e5bb16ce5da66a6a6167abd569e9e2",
       "license": "Apache-2.0 (Qwen3-VL)",
       "optional": true
     }

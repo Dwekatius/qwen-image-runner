@@ -100,7 +100,7 @@ You can install several and switch instantly from **Settings → Engine backend*
 
 ## Measured performance
 
-RTX 5070 Ti 16 GB · CUDA backend · Q8_0 + Q4_K_M encoder · Euler · CFG 6 · CPU offload + SageAttention:
+RTX 5070 Ti 16 GB · CUDA backend · Q8_0 + UD-Q4_K_XL encoder · Euler · CFG 6 · CPU offload + SageAttention:
 
 | Size | Steps | Time | Notes |
 |------|-------|------|-------|

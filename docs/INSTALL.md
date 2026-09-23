@@ -80,7 +80,8 @@ Everything is pinned in `engine.json` (engine) and `models.json` (weights) with 
 | File | Put it in |
 |---|---|
 | [leejet/Qwen-Image-2.1-GGUF](https://huggingface.co/leejet/Qwen-Image-2.1-GGUF) → `qwen_image_2.1-Q8_0.gguf` | `models/diffusion/` |
-| [Qwen/Qwen3-VL-8B-Instruct-GGUF](https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF) → `Qwen3VL-8B-Instruct-Q4_K_M.gguf` and `mmproj-Qwen3VL-8B-Instruct-F16.gguf` | `models/text_encoders/` |
+| [unsloth/Qwen3-VL-8B-Instruct-GGUF](https://huggingface.co/unsloth/Qwen3-VL-8B-Instruct-GGUF) → `Qwen3VL-8B-Instruct-UD-Q4_K_XL.gguf` | `models/text_encoders/` |
+| [Qwen/Qwen3-VL-8B-Instruct-GGUF](https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF) → `mmproj-Qwen3VL-8B-Instruct-F16.gguf` | `models/text_encoders/` |
 | [Comfy-Org/Qwen-Image-2.1](https://huggingface.co/Comfy-Org/Qwen-Image-2.1/tree/main/vae) → `qwen_image_2.1_vae_bf16.safetensors` | `models/vae/` |
 
 Cheaper GPU or CPU-only? The Q8 diffusion file can be replaced with `Q6_K`, `Q5_0` or `Q4_K` from the

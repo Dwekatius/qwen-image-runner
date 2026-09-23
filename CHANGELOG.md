@@ -11,6 +11,10 @@ All notable changes to this project are documented here. Format based on
   General Public License v3: use, modify, fork and share it freely, but any version you distribute
   must stay GPL-3.0 with its source available, so it cannot become a closed, paid product. The
   Qwen model weights keep their own research/evaluation terms and are never bundled.
+- **Text encoder upgraded to Unsloth Dynamic 2.0 UD-Q4_K_XL** (Qwen3-VL 8B, 5.15 GB, Apache-2.0) —
+  measured better than the uniform Q4_K_M it replaces (LPIPS 0.029, SSIM 0.959, 36.5 s vs 39.0 s);
+  the previous encoder remains available as an optional component; denoiser unchanged (leejet Q8_0 —
+  no gain at 8-bit).
 
 ### Fixed
 

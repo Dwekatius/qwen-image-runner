@@ -153,12 +153,13 @@ after showing the licence terms, with resume support and SHA-256 verification:
 | File | Size | Licence |
 |---|---|---|
 | `qwen_image_2.1-Q8_0.gguf` (diffusion) | 7.7 GB | Qwen Research License |
-| `Qwen3VL-8B-Instruct-Q4_K_M.gguf` (text encoder) | 5.0 GB | Apache-2.0 |
+| `Qwen3VL-8B-Instruct-UD-Q4_K_XL.gguf` (text encoder) | 5.1 GB | Apache-2.0 |
 | `mmproj-Qwen3VL-8B-Instruct-F16.gguf` (vision, for editing) | 1.2 GB | Apache-2.0 |
 | `qwen_image_2.1_vae_bf16.safetensors` (VAE) | 0.7 GB | Qwen Research License |
 
-Total ≈ 14.6 GB. The Qwen Research License allows research/evaluation use; commercial use needs
-separate permission from Alibaba.
+Total ≈ 14.6 GB. The text encoder is Unsloth's Dynamic 2.0 quant (UD-Q4_K_XL), measured better than
+the uniform Q4_K_M it replaces; the denoiser stays leejet's Q8_0. The Qwen Research License allows
+research/evaluation use; commercial use needs separate permission from Alibaba.
 
 ## Where things are stored
 

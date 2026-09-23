@@ -56,7 +56,8 @@ The engine binary and its CUDA runtime DLLs are downloaded from the upstream Git
 | Component | Source | License |
 |---|---|---|
 | Qwen-Image-2.1 (Q8_0 GGUF by leejet) | https://huggingface.co/leejet/Qwen-Image-2.1-GGUF | Qwen Research License |
-| Qwen3-VL-8B-Instruct (Q4_K_M and mmproj GGUF) | https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF | Apache-2.0 |
+| Qwen3-VL-8B-Instruct (UD-Q4_K_XL GGUF, by Unsloth) | https://huggingface.co/unsloth/Qwen3-VL-8B-Instruct-GGUF | Apache-2.0 |
+| Qwen3-VL-8B-Instruct (mmproj GGUF) | https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF | Apache-2.0 |
 | Qwen-Image-2.1 VAE | https://huggingface.co/Comfy-Org/Qwen-Image-2.1 | Qwen Research License |
 
 The Qwen Research License permits research/evaluation use; commercial use requires separate

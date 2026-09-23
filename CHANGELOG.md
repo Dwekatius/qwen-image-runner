@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses semantic versioning.
 
-## [Unreleased]
+## [1.2.1] — 2026-09-24
 
 ### Changed
 
@@ -18,9 +18,10 @@ All notable changes to this project are documented here. Format based on
 
 ### Fixed
 
-- Progress no longer sits on 'Queued…' during a render — the panel now shows 'Rendering…' while the
-  engine works (this engine build does not emit per-step progress; real step counts still show when
-  available).
+- Progress no longer sits on 'Queued…' while the engine is working — the card shows real step
+  progress (**Step 9 / 55 · 8.7 s/it**, with the bar filling by actual percentage) whenever the
+  engine reports it, and an honest 'Rendering…' plus the elapsed time when it does not (for example
+  when a stalled stdout reader drops the step lines) instead of a bogus 'Queued…'.
 - Desktop shortcut now carries the app logo: `Install.bat` points the shortcut's icon at the new
   multi-size `Logo.ico`, and the app serves a `favicon.ico` fallback next to the SVG favicon.
 - Suggested image filenames fall back to `qwen-image-runner` instead of the old `local-canvas` name.

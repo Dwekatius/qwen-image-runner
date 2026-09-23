@@ -149,7 +149,8 @@ set QIR_FAKE_ENGINE=1
 .venv\Scripts\python.exe -m backend.main      REM full app with a simulated engine
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the layout and ground rules.
+See [CONTRIBUTING.md](CONTRIBUTING.md) — this project does not accept external contributions; you
+can download, run and fork it under the license terms.
 
 ## Troubleshooting
 

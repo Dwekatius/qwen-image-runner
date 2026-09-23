@@ -1,19 +1,7 @@
-## What does this change?
+## This project does not accept external contributions
 
-<!-- A short description of the change and why it is needed. -->
+Pull requests are closed without review. Qwen Image Runner is a personal, source-available
+project — see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-## Checklist
-
-- [ ] `python -m pytest -q` passes (12 tests, no GPU needed)
-- [ ] No model weights, engine binaries, generated images, databases, logs or `settings.json` are committed
-- [ ] New behaviour is covered by a test (or a manual verification is described below)
-- [ ] UI changes were checked in a browser at both 1024px and ~1440px width
-- [ ] Documentation updated (`README.md`, `docs/GUIDE.md`, `docs/INSTALL.md`) if user-visible
-
-## How was it verified?
-
-<!-- Commands you ran, screenshots, measurements. -->
-
-## Related issues
-
-<!-- e.g. Closes #12 -->
+You are welcome to fork the repository and adapt it under the
+[PolyForm Noncommercial 1.0.0](../LICENSE) license terms.

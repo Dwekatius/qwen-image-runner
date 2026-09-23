@@ -1,34 +1,43 @@
-# Contributing to Qwen Image Runner
+# Contributing
 
-Thanks for your interest! This is a small, focused project — an unofficial local image studio for
-Qwen-Image-2.1 on Windows + NVIDIA.
+**This project does not accept external contributions.** Qwen Image Runner is a personal,
+source-available project: the repository is maintained by its owner alone, and **pull requests are
+closed without review**. There is no CLA to sign and no contribution process to follow.
+
+You are still very welcome to:
+
+- **Download and run** it for personal, educational, research or nonprofit use.
+- **Fork it** and adapt it to your own needs under the license below.
+- **Report bugs or share ideas** in the issue tracker — reports are read, but fixes and features
+  are implemented only by the owner, at their discretion.
 
 ## Ground rules
 
 - **Do not commit** model weights, engine binaries, generated images, local databases, logs, or
   `settings.json`. They are covered by `.gitignore` — keep it that way.
-- The project license is **PolyForm Noncommercial 1.0.0**. By contributing you agree that your
-  contribution is licensed under the same terms.
+- The project license is **PolyForm Noncommercial 1.0.0** ([LICENSE](LICENSE)). Forks and
+  derivative work stay under the same terms: personal, educational, research and nonprofit use;
+  commercial use and monetisation are not allowed.
 - Keep the app **local-only**: no telemetry, no network calls except the explicit model/engine
   downloads the user triggers.
 
-## Development setup
+## Development setup (for forks and local builds)
 
 ```bat
 Install.bat                     REM creates .venv, installs deps, fetches the pinned engine
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-You do **not** need a GPU or the model weights to develop the UI/backend: the test suite and a
+You do **not** need a GPU or the model weights to work on the UI/backend: the test suite and a
 MockEngine mode run everything locally.
 
 ```bat
-set QCANVAS_FAKE_ENGINE=1
+set QIR_FAKE_ENGINE=1
 .venv\Scripts\python.exe -m backend.main
 ```
 
 then open http://127.0.0.1:7878 — the engine is simulated (instant startup, fake progress,
-placeholder images), so the whole UI is exercisable on any machine.
+placeholder images), so the whole UI runs on any machine.
 
 ## Layout
 
@@ -36,19 +45,13 @@ placeholder images), so the whole UI is exercisable on any machine.
 |---|---|
 | `backend/` | FastAPI app, engine supervisor, job queue, SQLite persistence, downloads, save dialog |
 | `frontend/` | Vanilla ES-module UI (no build step) |
-| `scripts/` | bootstrap, launcher, stopper, and the Phase-0 validation tooling |
+| `scripts/` | bootstrap, launcher, stopper, and the validation tooling |
 | `tests/` | pytest suite (runs against MockEngine + a local fixture HTTP server) |
 | `docs/` | architecture/validation reports |
 | `engine.json`, `models.json` | pinned engine/model artifacts (size + SHA-256) |
 
-## What we look for in a PR
-
-- Tests for new behaviour (`python -m pytest -q` must stay green).
-- Honest UX: never invent progress, never silently downgrade quality, label destructive actions.
-- No new runtime dependencies unless they are well maintained and permissively licensed.
-- Keep the UI clean and quiet — it is meant to feel like a desktop app, not a dashboard.
-
-## Reporting bugs
+## Bug reports
 
 Include: what you did, what you expected, what happened, plus the contents of the **Logs** dialog
-(engine log) and your GPU/driver. Screenshots help a lot.
+(engine log) and your GPU/driver. Screenshots help a lot. Bug reports are welcome; code changes
+are not accepted.

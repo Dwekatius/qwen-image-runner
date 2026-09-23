@@ -5,6 +5,10 @@ title: "[feature] "
 labels: enhancement
 ---
 
+> Qwen Image Runner is a personal, source-available project: feature requests are read as
+> inspiration, but only the owner implements changes, and there is no guarantee (or timeline)
+> for any request. See [CONTRIBUTING.md](../CONTRIBUTING.md).
+
 ## What would you like to see?
 
 ## Why is it useful?

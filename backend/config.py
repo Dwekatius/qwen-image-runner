@@ -75,6 +75,9 @@ _LEGACY_EXTRA_ARGS = [["--diffusion-fa", "--sage-attn", "--offload-to-cpu", "--c
 
 DEFAULT_SETTINGS: dict = {
     "schema_version": 2,
+    "app": {
+        "quit_on_window_close": True,
+    },
     "engine": {
         "autostart": True,
         "backend": DEFAULT_BACKEND,

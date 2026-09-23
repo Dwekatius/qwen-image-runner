@@ -106,7 +106,14 @@ generated image in the Generate view).
 - **Start engine automatically** when the app opens.
 - **Storage** — where the engine, models, outputs and database live.
 - **Logs** (top bar) — the engine's own log, useful when something fails.
-- **Quit** — stops the engine and closes the service. Closing the window alone leaves the engine warm.
+- **Stop the app and unload the model when its window closes** — on by default. When the *last*
+  app window is closed, the engine stops (freeing the model from VRAM/RAM) and the local server
+  exits. Reloading a page is safe: the new page re-registers immediately and cancels a pending
+  shutdown. With several windows open, the app keeps running until the last one closes, and a
+  window that dies without closing is dropped after a heartbeat timeout (long enough to
+  survive Chrome's background-tab timer throttling). Turn the option off if
+  you want the engine to stay warm after closing the window.
+- **Quit** — stops the engine and closes the service immediately.
 
 ## Compute backends
 

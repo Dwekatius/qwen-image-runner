@@ -55,6 +55,86 @@ _gpu_cache: dict = {"ts": 0.0, "data": {}}
 _server_ref: dict = {}
 
 
+# ------------------------------------------------------------------ window lifecycle
+class WindowLifecycle:
+    """Tracks browser windows so the app can stop when the last one closes.
+
+    One browser tab = one session id. Tabs ping every few seconds; a tab that
+    disappears without a clean close is pruned once its heartbeat goes stale.
+    Shutdown fires only after every session has been gone for IDLE_GRACE seconds,
+    and only if at least one window ever connected (headless starts never exit).
+    """
+
+    # Chrome throttles hidden-tab timers to roughly once per minute after ~5 minutes
+    # (and more aggressively while a page stays idle), so a minimized window during a
+    # long render can legitimately go a minute between pings. This window covers that;
+    # the pagehide beacon still registers the normal close immediately (IDLE_GRACE).
+    HEARTBEAT_STALE_AFTER = 180.0
+    IDLE_GRACE = 6.0              # seconds with zero sessions before shutdown
+    TICK = 1.5
+
+    def __init__(self) -> None:
+        self.sessions: dict[str, float] = {}
+        self.ever_connected = False
+        self._idle_since: float | None = None
+        self.fired = False
+
+    def ping(self, sid: str, now: float | None = None) -> None:
+        self.sessions[sid] = time.time() if now is None else now
+        self.ever_connected = True
+        self._idle_since = None
+
+    def closing(self, sid: str, now: float | None = None) -> None:
+        now = time.time() if now is None else now
+        self.sessions.pop(sid, None)
+        if not self.sessions:
+            self._idle_since = now
+
+    def evaluate(self, now: float, enabled: bool) -> bool:
+        """Return True exactly once, when the app should shut down."""
+        stale = [sid for sid, seen in self.sessions.items() if now - seen > self.HEARTBEAT_STALE_AFTER]
+        for sid in stale:
+            del self.sessions[sid]
+        if not self.sessions and self._idle_since is None:
+            self._idle_since = now
+        if self.fired or not enabled or not self.ever_connected:
+            return False
+        if self.sessions or self._idle_since is None:
+            return False
+        if now - self._idle_since < self.IDLE_GRACE:
+            return False
+        self.fired = True
+        return True
+
+
+WINDOW = WindowLifecycle()
+
+
+async def _graceful_shutdown() -> None:
+    """Unload the engine and ask the server to exit (used by /api/app/quit and the monitor)."""
+    SHUTDOWN.set()  # release SSE streams so uvicorn can exit cleanly
+    await engine.stop()
+    await asyncio.sleep(0.3)
+    server = _server_ref.get("server")
+    if server:
+        server.should_exit = True
+    else:
+        os._exit(0)
+
+
+async def _lifecycle_monitor() -> None:
+    """Poll the window tracker and run the clean shutdown once the last window is gone."""
+    try:
+        while True:
+            await asyncio.sleep(WindowLifecycle.TICK)
+            enabled = bool((settings.get("app") or {}).get("quit_on_window_close", True))
+            if WINDOW.evaluate(time.time(), enabled):
+                await _graceful_shutdown()
+                return
+    except asyncio.CancelledError:
+        return
+
+
 # ------------------------------------------------------------------ security
 ALLOWED_HOSTS = {f"127.0.0.1:{config.APP_PORT}", f"localhost:{config.APP_PORT}", "testserver"}
 
@@ -68,7 +148,9 @@ async def local_protection(request: Request, call_next):
     if origin and origin not in {f"http://{h}" for h in ALLOWED_HOSTS}:
         return JSONResponse({"error": "forbidden origin"}, status_code=403)
     if request.method in ("POST", "PUT", "DELETE", "PATCH") and request.url.path.startswith("/api/"):
-        if request.headers.get("x-csrf", "") != CSRF_TOKEN:
+        # Browser beacons cannot set headers, so the lifecycle endpoints validate the
+        # CSRF token from their JSON body instead. Host/origin checks still apply to them.
+        if not request.url.path.startswith("/api/lifecycle/") and request.headers.get("x-csrf", "") != CSRF_TOKEN:
             return JSONResponse({"error": "missing or invalid CSRF token"}, status_code=403)
     return await call_next(request)
 
@@ -81,6 +163,11 @@ async def on_startup() -> None:
     if interrupted:
         bus.publish({"type": "notice", "text": f"{interrupted} unfinished job(s) marked interrupted after restart"})
     runner.start()
+    # Always run the monitor: it stays inert until a real window has pinged
+    # (ever_connected), so headless starts, GPU-less UI dev (fake engine) and tests
+    # can never trigger a shutdown before a window connects. The test fixtures reset
+    # WINDOW/SHUTDOWN per test, so no state leaks across test event loops.
+    asyncio.create_task(_lifecycle_monitor())
     if settings.get("engine", {}).get("autostart", True):
         async def warm() -> None:
             try:
@@ -860,6 +947,12 @@ async def put_settings(body: dict) -> dict:
     if isinstance(autostart, bool):
         settings["engine"]["autostart"] = autostart
 
+    app_body = body.get("app")
+    if isinstance(app_body, dict):
+        current_app = settings.setdefault("app", {})
+        if isinstance(app_body.get("quit_on_window_close"), bool):
+            current_app["quit_on_window_close"] = app_body["quit_on_window_close"]
+
     assistant_body = body.get("assistant")
     if isinstance(assistant_body, dict):
         current = settings.setdefault("assistant", {})
@@ -919,17 +1012,34 @@ async def logs(lines: int = 200) -> dict:
 @app.post("/api/app/quit")
 async def quit_app() -> dict:
     async def shutdown() -> None:
-        await asyncio.sleep(0.2)
-        SHUTDOWN.set()  # release SSE streams so uvicorn can exit cleanly
-        await engine.stop()
-        await asyncio.sleep(0.3)
-        server = _server_ref.get("server")
-        if server:
-            server.should_exit = True
-        else:
-            os._exit(0)
+        await asyncio.sleep(0.2)  # let this response reach the caller first
+        await _graceful_shutdown()
     asyncio.create_task(shutdown())
     return {"ok": True, "message": "shutting down"}
+
+
+# ------------------------------------------------------------------ window lifecycle API
+def _require_lifecycle_token(body: dict) -> str:
+    """Validate the CSRF token from the JSON body (browser beacons cannot set headers)."""
+    token = (body or {}).get("token")
+    if not isinstance(token, str) or not secrets.compare_digest(token, CSRF_TOKEN):
+        raise HTTPException(status_code=403, detail="missing or invalid CSRF token")
+    sid = (body or {}).get("id")
+    if not isinstance(sid, str) or not sid:
+        raise HTTPException(status_code=400, detail="missing session id")
+    return sid
+
+
+@app.post("/api/lifecycle/ping")
+async def lifecycle_ping(body: dict) -> dict:
+    WINDOW.ping(_require_lifecycle_token(body))
+    return {"ok": True}
+
+
+@app.post("/api/lifecycle/closing")
+async def lifecycle_closing(body: dict) -> dict:
+    WINDOW.closing(_require_lifecycle_token(body))
+    return {"ok": True}
 
 
 # ------------------------------------------------------------------ static frontend

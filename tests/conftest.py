@@ -36,6 +36,10 @@ def app_module(tmp_path, monkeypatch):
     main.settings = config.load_settings()
     main.settings["license_accepted"] = True
     main.runner.settings = main.settings
+    # fresh window-lifecycle state per test: a monitor task from a previous test
+    # must never see a stale idle timer and trigger a real shutdown
+    main.WINDOW = main.WindowLifecycle()
+    main.SHUTDOWN.clear()
     # each TestClient runs its own event loop; give the runner a fresh worker
     import asyncio
     main.runner._task = None

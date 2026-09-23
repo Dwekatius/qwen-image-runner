@@ -38,6 +38,8 @@ const S = {
   setupReady: false,
 };
 
+const WINDOW_ID = crypto.randomUUID();
+
 /* ------------------------------------------------------------ helpers */
 async function api(path, opts = {}, retried = false) {
   const headers = Object.assign({}, opts.headers || {});
@@ -64,6 +66,20 @@ async function api(path, opts = {}, retried = false) {
     throw new Error(detail);
   }
   return r.json();
+}
+
+function lifecycle(path, beacon = false) {
+  const payload = JSON.stringify({ id: WINDOW_ID, token: S.csrf });
+  if (beacon) {
+    navigator.sendBeacon(path, new Blob([payload], { type: "application/json" }));
+    return;
+  }
+  fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRF": S.csrf },
+    body: payload,
+    keepalive: true,
+  }).catch(() => {});
 }
 
 function toast(text, kind = "", ms = 4200) {
@@ -1416,6 +1432,9 @@ async function boot() {
     toast("Cannot reach the Qwen Image Runner service", "error", 8000);
     return;
   }
+  // cancel a pending quit-on-close (reload) and keep this window counted as open
+  lifecycle("/api/lifecycle/ping");
+  setInterval(() => lifecycle("/api/lifecycle/ping"), 4000);
   connectEvents();
   try {
     const cfg = await api("/api/settings");
@@ -1615,6 +1634,10 @@ function wire() {
     try { await api("/api/settings", { method: "PUT", json: { engine_autostart: $("#set-autostart").checked } }); }
     catch (e) { toast(e.message, "error"); }
   };
+  $("#set-quit-close").onchange = async () => {
+    try { await api("/api/settings", { method: "PUT", json: { app: { quit_on_window_close: $("#set-quit-close").checked } } }); }
+    catch (e) { toast(e.message, "error"); }
+  };
   $("#set-restart").onclick = () => $("#btn-engine-restart").click();
   $("#set-stop").onclick = () => $("#btn-engine-stop").click();
 
@@ -1644,6 +1667,7 @@ async function openSettings() {
   try {
     const cfg = await api("/api/settings");
     S.assistant = cfg.assistant || {};
+    $("#set-quit-close").checked = cfg.app?.quit_on_window_close !== false;
     $("#set-asst-enabled").checked = !!S.assistant.enabled;
     $("#set-asst-key").value = "";
     $("#set-asst-key").placeholder = S.assistant.api_key_set
@@ -1687,4 +1711,15 @@ async function openLogs() {
 }
 
 wire();
+
+// closing the tab/page unregisters this window; the server still waits for the
+// grace period, so a reload (pagehide → new ping) never stops the app.
+window.addEventListener("pagehide", () => lifecycle("/api/lifecycle/closing", true));
+window.addEventListener("beforeunload", () => lifecycle("/api/lifecycle/closing", true));
+// hidden tabs get their timers throttled to ~1/minute; refresh the heartbeat
+// as soon as the window is visible again so the app never looks stale.
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) lifecycle("/api/lifecycle/ping");
+});
+
 boot();

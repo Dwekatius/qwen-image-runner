@@ -51,6 +51,9 @@
 - **Transparent PNG** output, embedded metadata, full gallery with effective parameters.
 - **Guides inside the app** — the **Guide** tab renders `docs/GUIDE.md`, and `docs/INSTALL.md` covers
   prerequisites and manual installation.
+- **Closes cleanly, stays warm only when you want it** — close the last app window and the engine
+  unloads the model and the local server exits; reloading a page never kills a running app, and
+  extra windows keep it alive until the last one closes (toggle in *Settings → Engine*).
 - **Local-only** — binds to `127.0.0.1`, Host/Origin + CSRF protection, no telemetry.
 
 ## Screenshots

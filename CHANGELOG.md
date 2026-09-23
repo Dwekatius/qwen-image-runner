@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses semantic versioning.
 
+## [Unreleased]
+
+### Added
+
+- **Clean shutdown when the last app window closes** — once every app window is gone, the engine is
+  stopped (the model is unloaded) and the local server exits cleanly. Redesigned for browser reality:
+  reloading a page is safe (the new page re-registers immediately), multiple windows keep the app
+  alive until the last one closes, and a window that dies without closing is detected via heartbeat
+  timeout. Exposed as *Stop the app and unload the model when its window closes* in
+  *Settings → Engine* (on by default, persisted in `settings.json → app.quit_on_window_close`).
+
 ## [1.2.1] — 2026-09-24
 
 ### Changed

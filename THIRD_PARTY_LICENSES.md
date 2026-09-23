@@ -1,6 +1,6 @@
 # Third-party licenses & notices
 
-Qwen Image Runner itself is licensed under the **PolyForm Noncommercial License 1.0.0** (see `LICENSE`).
+Qwen Image Runner itself is licensed under the **GNU General Public License v3.0** (see `LICENSE`).
 This file lists the third-party components the app uses and their licenses.
 
 > Versions below are from the environment pinned at the v1.0 release (2026-09-22).

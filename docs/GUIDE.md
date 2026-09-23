@@ -200,8 +200,8 @@ A single edit with one reference takes roughly 110–214 s at 1024×1024.
 
 ## Licences
 
-- App code: **PolyForm Noncommercial 1.0.0** — free for personal, educational, research and nonprofit
-  use; commercial use and monetisation are not permitted.
+- App code: **GNU GPL v3** — free to use, modify and share; any distributed version must stay
+  open source under the same license.
 - Model weights: **Qwen Research License** (see above).
 - Engine: [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp) (MIT).
 

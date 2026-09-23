@@ -45,7 +45,7 @@ any time from **Settings → Engine backend → Install**.
 
 `Launch.bat` starts the local service and opens the studio in its own window. The setup screen asks for:
 
-1. **Licence acceptance** — the app (PolyForm Noncommercial 1.0.0) and the model weights
+1. **Licence acceptance** — the app (GPL-3.0) and the model weights
    (Qwen Research License). Nothing is downloaded before you accept.
 2. **Compute backend** — pick what runs the model; download it if it is not installed yet.
 3. **Model files** — ~14.6 GB, resumable, checksum-verified.

@@ -6,7 +6,7 @@ closed without review**. There is no CLA to sign and no contribution process to 
 
 You are still very welcome to:
 
-- **Download and run** it for personal, educational, research or nonprofit use.
+- **Download and run** it for whatever you like — the app code is GPL-3.0.
 - **Fork it** and adapt it to your own needs under the license below.
 - **Report bugs or share ideas** in the issue tracker — reports are read, but fixes and features
   are implemented only by the owner, at their discretion.
@@ -15,9 +15,10 @@ You are still very welcome to:
 
 - **Do not commit** model weights, engine binaries, generated images, local databases, logs, or
   `settings.json`. They are covered by `.gitignore` — keep it that way.
-- The project license is **PolyForm Noncommercial 1.0.0** ([LICENSE](LICENSE)). Forks and
-  derivative work stay under the same terms: personal, educational, research and nonprofit use;
-  commercial use and monetisation are not allowed.
+- The app code is licensed under the **GNU GPL v3** ([LICENSE](LICENSE)): use it, modify it, fork
+  it, share it. If you distribute your version it must stay GPL-3.0 with its source available —
+  nobody can turn it into a closed, paid product. The **model weights** keep their own terms
+  (Qwen Research License) and are never bundled with the code.
 - Keep the app **local-only**: no telemetry, no network calls except the explicit model/engine
   downloads the user triggers.
 

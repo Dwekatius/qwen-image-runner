@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Changed
+
+- **Relicensed to GPL-3.0** — the app code moved from PolyForm Noncommercial 1.0.0 to the GNU
+  General Public License v3: use, modify, fork and share it freely, but any version you distribute
+  must stay GPL-3.0 with its source available, so it cannot become a closed, paid product. The
+  Qwen model weights keep their own research/evaluation terms and are never bundled.
+
 ### Fixed
 
 - Progress no longer sits on 'Queued…' during a render — the panel now shows 'Rendering…' while the

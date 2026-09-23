@@ -2,6 +2,9 @@
 
 **Revised 2026-09-21 · Initial model: Qwen-Image-2.1**
 
+> *Historical planning document — earlier licensing decisions (PolyForm Noncommercial) are kept for
+> the record; the project now ships under the GNU GPL v3 (see `LICENSE`).*
+
 ## 1. Release scope
 
 Build a clean, LM Studio–style Windows web app that dwekat can use to generate and edit images locally. Start with Qwen-Image-2.1 and target Q8_0 diffusion weights on the RTX 5070 Ti with 16 GB VRAM.

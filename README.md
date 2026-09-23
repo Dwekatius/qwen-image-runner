@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue" alt="License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPLv3-blue" alt="License"></a>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey" alt="Platform">
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python">
   <img src="https://img.shields.io/badge/status-v1.2-success" alt="Status">
@@ -172,8 +172,10 @@ can download, run and fork it under the license terms.
 
 ## License
 
-- **App code:** [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0) —
-  free for personal, educational, research and nonprofit use; commercial use and monetisation prohibited.
+- **App code:** [GNU GPL v3](LICENSE) — free to use, modify, fork and share. Any version you
+  distribute must stay GPL-3.0 with its source available, so nobody can turn it into a closed,
+  paid product. (The license does not forbid selling copies, but the source must come with them —
+  which is why proprietary resale does not work in practice.)
 - **Model weights:** Qwen Research License (downloaded by you at first run, never bundled).
 - **Engine:** [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp) (MIT).
 - Third-party inventory: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).

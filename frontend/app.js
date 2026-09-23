@@ -1671,7 +1671,7 @@ async function openSettings() {
       models.components.map((c) => `${c.present ? "✓" : "✗"} ${c.destination} (${fmtBytes(c.bytes)})`).join("\n");
     $("#set-about").innerHTML =
       `<b>${meta.app}</b> v${meta.version} — unofficial local studio for Qwen-Image-2.1.<br>` +
-      `App license: ${meta.license} (noncommercial). Model weights: Qwen Research License.<br>` +
+      `App license: ${meta.license}. Model weights: Qwen Research License.<br>` +
       `Not affiliated with, endorsed by, or connected to Alibaba/Qwen.`;
   } catch { /* ignore */ }
   $("#settings-modal").classList.remove("hidden");

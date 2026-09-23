@@ -45,7 +45,8 @@ git commit -m "Qwen Image Runner 1.0.0"
 
 ## 5. Wording rules (kept consistent across README / repo description)
 
-- Say **source-available**, never "open source" (PolyForm Noncommercial is not OSI-approved).
+- App code is **GPL-3.0** and OSI-approved: call it open source. The **model weights** are not open
+  source — the Qwen Research License limits them to research/evaluation.
 - Always include the disclaimer: *unofficial project, not affiliated with Alibaba/Qwen*.
 - State the hardware assumption: Windows + NVIDIA, validated on RTX 5070 Ti 16 GB.
 

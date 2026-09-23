@@ -176,7 +176,7 @@ async def models() -> dict:
         "license_accepted": bool(settings.get("license_accepted")),
         "license": {
             "app": config.SPDX_LICENSE,
-            "app_url": "https://polyformproject.org/licenses/noncommercial/1.0.0",
+            "app_url": "https://www.gnu.org/licenses/gpl-3.0.html",
             "model": "Qwen Research License (research/evaluation; separate permission for commercial use)",
             "model_url": "https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE",
             "unofficial": "Unofficial project — not affiliated with, endorsed by, or connected to Alibaba/Qwen.",
